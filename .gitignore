@@ -1,0 +1,33 @@
+# Secrets and local state
+.env
+.env.local
+.env.*.local
+!.env.example
+.dbpw
+.app-env.txt
+
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm-cache/
+
+# Build output
+.next/
+out/
+dist/
+build/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# OS / editor
+Thumbs.db
+.DS_Store
+*.log
+
+# Local tooling overrides
+.local/

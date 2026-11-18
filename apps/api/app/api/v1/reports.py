@@ -1,0 +1,193 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.api.deps import Principal, get_principal
+from app.db.session import get_db
+from app.models import (
+    Counter,
+    Invoice,
+    MedicineBatch,
+    Payment,
+    Product,
+    Shop,
+    User,
+)
+from app.models.catalog import Category
+from app.schemas.catalog import ExpiryAlert, LowStockAlert
+from app.schemas.reports import DashboardResponse, DashboardSummary, SalesPoint
+from app.schemas.shop import CounterActivity, RecentTransaction
+
+router = APIRouter(prefix="/reports", tags=["reports"])
+
+EXPIRY_WINDOW_DAYS = 90
+
+
+@router.get("/dashboard", response_model=DashboardResponse)
+def dashboard(
+    principal: Principal = Depends(get_principal), db: Session = Depends(get_db)
+) -> DashboardResponse:
+    shop_id = principal.shop_id
+    today = datetime.now(UTC).date()
+
+    finalized = Invoice.status == "finalized"
+
+    # Daily sales summary + average bill, always against finalized invoices only.
+    today_sales, invoice_count = db.execute(
+        select(func.coalesce(func.sum(Invoice.total), 0), func.count(Invoice.id)).where(
+            Invoice.shop_id == shop_id,
+            finalized,
+            func.date(Invoice.finalized_at) == today,
+        )
+    ).one()
+    invoice_count = int(invoice_count or 0)
+    average_bill = (today_sales / invoice_count) if invoice_count else 0
+
+    # Low stock and medicine expiry alerts.
+    low_stock_rows = db.execute(
+        select(Product, Category.name_en)
+        .join(Category, Product.category_id == Category.id)
+        .where(
+            Product.shop_id == shop_id,
+            Product.is_active.is_(True),
+            Product.stock_on_hand <= Product.low_stock_threshold,
+        )
+        .order_by(Product.stock_on_hand)
+        .limit(8)
+    ).all()
+
+    expiry_cutoff = today + timedelta(days=EXPIRY_WINDOW_DAYS)
+    expiring_rows = db.execute(
+        select(MedicineBatch, Product)
+        .join(Product, MedicineBatch.product_id == Product.id)
+        .where(
+            MedicineBatch.shop_id == shop_id,
+            MedicineBatch.is_active.is_(True),
+            MedicineBatch.quantity_on_hand > 0,
+            MedicineBatch.expiry_date <= expiry_cutoff,
+        )
+        .order_by(MedicineBatch.expiry_date)
+        .limit(8)
+    ).all()
+
+    # Three-counter activity.
+    counter_rows = db.execute(
+        select(
+            Counter,
+            func.count(Invoice.id).label("invoices"),
+            func.coalesce(func.sum(Invoice.total), 0).label("sales"),
+        )
+        .outerjoin(
+            Invoice,
+            (Invoice.counter_id == Counter.id)
+            & (Invoice.finalized_at.isnot(None))
+            & (func.date(Invoice.finalized_at) == today)
+            & (Invoice.status == "finalized"),
+        )
+        .where(Counter.shop_id == shop_id, Counter.is_active.is_(True))
+        .group_by(Counter.id)
+        .order_by(Counter.sort_order)
+    ).all()
+
+    counters = [
+        CounterActivity(
+            id=c.id,
+            code=c.code,
+            name_en=c.name_en,
+            name_bn=c.name_bn,
+            active_cashier=None if int(invoices) == 0 else "Demo cashier",
+            invoice_count=int(invoices),
+            total_sales=sales,
+            is_busy=int(invoices) > 0,
+        )
+        for c, invoices, sales in counter_rows
+    ]
+
+    # Last 7 days of sales for the chart.
+    series_rows = db.execute(
+        select(
+            func.date(Invoice.finalized_at).label("bucket"),
+            func.coalesce(func.sum(Invoice.total), 0).label("sales"),
+            func.count(Invoice.id).label("invoices"),
+        )
+        .where(Invoice.shop_id == shop_id, finalized)
+        .group_by("bucket")
+        .order_by("bucket")
+        .limit(14)
+    ).all()
+    sales_series = [
+        SalesPoint(bucket=r.bucket, sales=r.sales, invoice_count=int(r.invoices))
+        for r in series_rows
+    ]
+
+    recent_rows = db.execute(
+        select(Invoice, Payment.method, Counter.code, User.name, Shop.is_demo)
+        .join(Counter, Invoice.counter_id == Counter.id)
+        .outerjoin(Payment, Payment.invoice_id == Invoice.id)
+        .outerjoin(User, Invoice.created_by == User.id)
+        .join(Shop, Invoice.shop_id == Shop.id)
+        .where(Invoice.shop_id == shop_id)
+        .order_by(Invoice.created_at.desc())
+        .limit(6)
+    ).all()
+    recent = [
+        RecentTransaction(
+            id=i.id,
+            invoice_number=i.invoice_number,
+            counter_code=code,
+            customer_name=None,
+            total=i.total,
+            method=method,
+            finalized_at=i.finalized_at,
+            status=i.status,
+        )
+        for i, method, code, _name, _demo in recent_rows
+    ]
+
+    is_demo = bool(db.scalar(select(Shop.is_demo).where(Shop.id == shop_id)))
+
+    return DashboardResponse(
+        summary=DashboardSummary(
+            today_sales=today_sales,
+            invoice_count=invoice_count,
+            average_bill=average_bill,
+            low_stock_count=len(low_stock_rows),
+            expiring_soon_count=len(expiring_rows),
+            active_counters=len(counters),
+            is_demo=is_demo,
+            generated_at=datetime.now(UTC),
+        ),
+        counters=counters,
+        sales_series=sales_series,
+        recent_transactions=recent,
+        low_stock=[
+            LowStockAlert(
+                product_id=p.id,
+                sku=p.sku,
+                name_en=p.name_en,
+                name_bn=p.name_bn,
+                stock_on_hand=p.stock_on_hand,
+                low_stock_threshold=p.low_stock_threshold,
+                category_name_en=cat,
+            )
+            for p, cat in low_stock_rows
+        ],
+        expiring=[
+            ExpiryAlert(
+                batch_id=b.id,
+                product_id=p.id,
+                sku=p.sku,
+                name_en=p.name_en,
+                name_bn=p.name_bn,
+                batch_number=b.batch_number,
+                expiry_date=b.expiry_date,
+                quantity_on_hand=b.quantity_on_hand,
+                days_to_expiry=(b.expiry_date - today).days,
+            )
+            for b, p in expiring_rows
+        ],
+    )

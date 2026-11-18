@@ -1,0 +1,140 @@
+{
+  "app": {
+    "name": "শপফ্লো",
+    "tagline": "ফার্মেসি ও মুদি",
+    "demoBadge": "ডেমো ডেটা"
+  },
+  "nav": {
+    "dashboard": "ড্যাশবোর্ড",
+    "billing": "বিলিং",
+    "inventory": "ইনভেন্টরি",
+    "customers": "গ্রাহক",
+    "loyalty": "লয়্যালটি",
+    "reports": "বিক্রয় রিপোর্ট",
+    "settings": "সেটিংস"
+  },
+  "actions": {
+    "newBill": "নতুন বিল",
+    "newSale": "নতুন বিক্রয়",
+    "viewAll": "সব দেখুন",
+    "search": "খুঁজুন",
+    "language": "ভাষা",
+    "menu": "মেনু",
+    "close": "বন্ধ করুন",
+    "retry": "আবার চেষ্টা করুন"
+  },
+  "states": {
+    "loading": "লোড হচ্ছে…",
+    "empty": "এখনও কোনো ডেটা নেই",
+    "error": "কিছু ভুল হয়েছে",
+    "emptyHint": "ডেটা উপলব্ধ হলে এখানে রেকর্ড দেখা যাবে।"
+  },
+  "dashboard": {
+    "title": "ড্যাশবোর্ড",
+    "subtitle": "আজকের ব্যবসার এক ঝলক",
+    "todaySales": "আজকের বিক্রয়",
+    "invoices": "ইনভয়েস",
+    "averageBill": "গড় বিল",
+    "lowStock": "স্বল্প স্টক",
+    "expiringSoon": "শীঘ্রই মেয়াদোত্তীর্ণ",
+    "counterActivity": "কাউন্টার কার্যক্রম",
+    "salesTrend": "বিক্রয় (শেষ ৭ দিন)",
+    "recentTransactions": "সাম্প্রতিক লেনদেন",
+    "quickActions": "দ্রুত অ্যাকশন",
+    "vsYesterday": "গতকালের তুলনায়",
+    "items": "টি আইটেম"
+  },
+  "counters": {
+    "counter": "কাউন্টার",
+    "busy": "ব্যস্ত",
+    "idle": "খালি",
+    "sales": "বিক্রয়",
+    "invoices": "ইনভয়েস"
+  },
+  "billing": {
+    "title": "বিলিং",
+    "subtitle": "তিনটি কাউন্টারের জন্য স্পর্শ-বান্ধব চেকআউট",
+    "searchProducts": "পণ্য খুঁজুন, বারকোড স্ক্যান করুন বা নাম লিখুন…",
+    "cart": "কার্ট",
+    "customer": "গ্রাহক",
+    "walkIn": "সরাসরি গ্রাহক",
+    "subtotal": "সাবটোটাল",
+    "discount": "ছাড়",
+    "loyaltyDiscount": "লয়্যালটি ছাড়",
+    "total": "মোট",
+    "payCash": "নগদ",
+    "payBkash": "বিকাশ",
+    "payNagad": "নগদ (Nagad)",
+    "hold": "হোল্ড",
+    "finalize": "বিল চূড়ান্ত করুন",
+    "emptyCart": "কার্ট খালি",
+    "comingSoon": "সম্পূর্ণ চেকআউট পর্ব ২-এ আসছে"
+  },
+  "inventory": {
+    "title": "ইনভেন্টরি",
+    "subtitle": "স্টক, ব্যাচ ও মেয়াদ",
+    "product": "পণ্য",
+    "sku": "SKU",
+    "category": "বিভাগ",
+    "stock": "স্টক",
+    "price": "দাম",
+    "status": "অবস্থা",
+    "inStock": "স্টকে আছে",
+    "lowStock": "স্বল্প স্টক",
+    "outOfStock": "স্টক শেষ",
+    "medicine": "ঔষধ",
+    "grocery": "মুদি",
+    "expiry": "মেয়াদ",
+    "batch": "ব্যাচ",
+    "days": "দিন"
+  },
+  "customers": {
+    "title": "গ্রাহক",
+    "subtitle": "অ্যাকাউন্ট, বাকি ও লয়্যালটি",
+    "name": "নাম",
+    "phone": "ফোন",
+    "points": "পয়েন্ট",
+    "creditLimit": "বাকির সীমা",
+    "dues": "বাকি"
+  },
+  "loyalty": {
+    "title": "লয়্যালটি",
+    "subtitle": "পয়েন্ট, রিডেম্পশন ও নিয়ম",
+    "balance": "পয়েন্ট ব্যালেন্স",
+    "earned": "মোট অর্জিত",
+    "redeemed": "মোট ব্যবহৃত",
+    "canRedeem": "রিডিম করা যাবে",
+    "locked": "লক করা",
+    "rule": "প্রতি ৳১০০-তে ১ পয়েন্ট · ৩০০-এ আনলক · ১০০ পয়েন্ট = ৳১০০"
+  },
+  "reports": {
+    "title": "বিক্রয় রিপোর্ট",
+    "subtitle": "দৈনিক ও মাসিক পারফরম্যান্স",
+    "daily": "দৈনিক",
+    "monthly": "মাসিক",
+    "date": "তারিখ",
+    "sales": "বিক্রয়",
+    "invoices": "ইনভয়েস",
+    "avgBill": "গড় বিল",
+    "cash": "নগদ",
+    "bkash": "বিকাশ",
+    "nagad": "নগদ (Nagad)",
+    "method": "পেমেন্ট পদ্ধতি"
+  },
+  "settings": {
+    "title": "সেটিংস",
+    "subtitle": "দোকান, কাউন্টার ও পছন্দ",
+    "shop": "দোকান",
+    "counters": "কাউন্টার",
+    "language": "ভাষা",
+    "currency": "মুদ্রা",
+    "timezone": "সময় অঞ্চল",
+    "receipt": "রসিদ",
+    "users": "কর্মী"
+  },
+  "misc": {
+    "bdt": "৳",
+    "seeAll": "সব দেখুন",
+    "demo": "ডেমো"
+  }
+}

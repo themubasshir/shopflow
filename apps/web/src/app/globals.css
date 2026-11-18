@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme {
+  /* ShopFlow palette — emerald retail design system */
+  --color-primary: #15803d;
+  --color-primary-strong: #166534;
+  --color-primary-soft: #22c55e;
+  --color-primary-050: #f0fdf4;
+  --color-primary-100: #dcfce7;
+  --color-primary-200: #bbf7d0;
+  --color-accent: #0369a1;
+  --color-destructive: #dc2626;
+  --color-amber: #d97706;
+  --color-surface: #f0fdf4;
+  --color-card: #ffffff;
+  --color-muted: #e8f0f1;
+  --color-muted-foreground: #475569;
+  --color-border: #bbf7d0;
+  --color-ink: #14532d;
+  --font-sans: "Plus Jakarta Sans", "Noto Sans Bengali", ui-sans-serif, system-ui, sans-serif;
+  --font-bengali: "Noto Sans Bengali", "Plus Jakarta Sans", ui-sans-serif, sans-serif;
+}
+
+:root {
+  --color-primary: #15803d;
+  --color-primary-strong: #166534;
+  --color-primary-soft: #22c55e;
+  --color-primary-050: #f0fdf4;
+  --color-primary-100: #dcfce7;
+  --color-primary-200: #bbf7d0;
+  --color-accent: #0369a1;
+  --color-destructive: #dc2626;
+  --color-amber: #d97706;
+  --color-surface: #f0fdf4;
+  --color-card: #ffffff;
+  --color-muted: #e8f0f1;
+  --color-muted-foreground: #475569;
+  --color-border: #bbf7d0;
+  --color-ink: #14532d;
+  --ring: #15803d;
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+html[lang="bn"],
+html[lang="bn"] body {
+  font-family: var(--font-bengali);
+  line-height: 1.75;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Custom scrollbar for data-dense tables */
+.table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.table-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-primary-200);
+  border-radius: 999px;
+}

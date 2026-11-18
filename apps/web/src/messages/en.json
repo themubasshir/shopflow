@@ -1,0 +1,140 @@
+{
+  "app": {
+    "name": "ShopFlow",
+    "tagline": "Pharmacy & Grocery",
+    "demoBadge": "Demo data"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "billing": "Billing",
+    "inventory": "Inventory",
+    "customers": "Customers",
+    "loyalty": "Loyalty",
+    "reports": "Sales Reports",
+    "settings": "Settings"
+  },
+  "actions": {
+    "newBill": "New Bill",
+    "newSale": "New Sale",
+    "viewAll": "View all",
+    "search": "Search",
+    "language": "Language",
+    "menu": "Menu",
+    "close": "Close",
+    "retry": "Retry"
+  },
+  "states": {
+    "loading": "Loading…",
+    "empty": "No data yet",
+    "error": "Something went wrong",
+    "emptyHint": "Records will appear here once data is available."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Today's business at a glance",
+    "todaySales": "Today's Sales",
+    "invoices": "Invoices",
+    "averageBill": "Average Bill",
+    "lowStock": "Low Stock",
+    "expiringSoon": "Expiring Soon",
+    "counterActivity": "Counter Activity",
+    "salesTrend": "Sales (last 7 days)",
+    "recentTransactions": "Recent Transactions",
+    "quickActions": "Quick Actions",
+    "vsYesterday": "vs yesterday",
+    "items": "items"
+  },
+  "counters": {
+    "counter": "Counter",
+    "busy": "Busy",
+    "idle": "Idle",
+    "sales": "Sales",
+    "invoices": "invoices"
+  },
+  "billing": {
+    "title": "Billing",
+    "subtitle": "Touch-friendly checkout for three counters",
+    "searchProducts": "Search products, scan barcode, or type name…",
+    "cart": "Cart",
+    "customer": "Customer",
+    "walkIn": "Walk-in customer",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "loyaltyDiscount": "Loyalty discount",
+    "total": "Total",
+    "payCash": "Cash",
+    "payBkash": "bKash",
+    "payNagad": "Nagad",
+    "hold": "Hold",
+    "finalize": "Finalize Bill",
+    "emptyCart": "Cart is empty",
+    "comingSoon": "Full checkout workflow in Phase 2"
+  },
+  "inventory": {
+    "title": "Inventory",
+    "subtitle": "Stock, batches & expiry",
+    "product": "Product",
+    "sku": "SKU",
+    "category": "Category",
+    "stock": "Stock",
+    "price": "Price",
+    "status": "Status",
+    "inStock": "In stock",
+    "lowStock": "Low stock",
+    "outOfStock": "Out of stock",
+    "medicine": "Medicine",
+    "grocery": "Grocery",
+    "expiry": "Expiry",
+    "batch": "Batch",
+    "days": "days"
+  },
+  "customers": {
+    "title": "Customers",
+    "subtitle": "Accounts, dues & loyalty",
+    "name": "Name",
+    "phone": "Phone",
+    "points": "Points",
+    "creditLimit": "Credit Limit",
+    "dues": "Dues"
+  },
+  "loyalty": {
+    "title": "Loyalty",
+    "subtitle": "Points, redemptions & rules",
+    "balance": "Points Balance",
+    "earned": "Lifetime Earned",
+    "redeemed": "Lifetime Redeemed",
+    "canRedeem": "Can redeem",
+    "locked": "Locked",
+    "rule": "1 point per ৳100 spent · unlock at 300 · 100 pts = ৳100"
+  },
+  "reports": {
+    "title": "Sales Reports",
+    "subtitle": "Daily and monthly performance",
+    "daily": "Daily",
+    "monthly": "Monthly",
+    "date": "Date",
+    "sales": "Sales",
+    "invoices": "Invoices",
+    "avgBill": "Avg Bill",
+    "cash": "Cash",
+    "bkash": "bKash",
+    "nagad": "Nagad",
+    "method": "Payment Method"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Shop, counters & preferences",
+    "shop": "Shop",
+    "counters": "Counters",
+    "language": "Language",
+    "currency": "Currency",
+    "timezone": "Timezone",
+    "receipt": "Receipt",
+    "users": "Staff"
+  },
+  "misc": {
+    "bdt": "৳",
+    "seeAll": "See all",
+    "demo": "Demo"
+  }
+}
