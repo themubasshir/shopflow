@@ -1,17 +1,42 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import Principal, get_principal
+from app.api.deps import Principal, get_authenticated_principal, get_principal
 from app.db.session import get_db
 from app.models import Counter, Customer, Invoice, LoyaltyAccount
 from app.schemas.common import Paginated
 from app.schemas.reports import LoyaltyAccountOut
-from app.schemas.sales import CustomerOut, InvoiceOut
+from app.schemas.sales import (
+    CustomerOut,
+    InvoiceCreate,
+    InvoiceCreateOut,
+    InvoiceOut,
+)
+from app.schemas.shop import CounterOut
+from app.services.billing import finalize_invoice
 
 router = APIRouter(tags=["sales"])
+
+
+@router.get("/counters", response_model=list[CounterOut])
+def list_counters(
+    principal: Principal = Depends(get_principal), db: Session = Depends(get_db)
+) -> list[CounterOut]:
+    """Active checkout counters for the caller's shop (billing screen)."""
+    rows = db.execute(
+        select(Counter)
+        .where(Counter.shop_id == principal.shop_id, Counter.is_active.is_(True))
+        .order_by(Counter.sort_order)
+    ).scalars()
+    return [
+        CounterOut(
+            id=c.id, code=c.code, name_en=c.name_en, name_bn=c.name_bn, is_active=c.is_active
+        )
+        for c in rows
+    ]
 
 
 @router.get("/customers", response_model=Paginated[CustomerOut])
@@ -129,3 +154,25 @@ def list_invoices(
         limit=limit,
         offset=offset,
     )
+
+
+@router.post(
+    "/invoices",
+    response_model=InvoiceCreateOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_invoice(
+    body: InvoiceCreate,
+    response: Response,
+    idempotency_key: str = Header(min_length=8, max_length=120, alias="Idempotency-Key"),
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> InvoiceCreateOut:
+    """Finalize a bill atomically: stock deduction, payment, loyalty earn and
+    the idempotency record all commit — or roll back — together. Cashier
+    identity comes from the JWT; counter must belong to the caller's shop."""
+    principal.require("sales:write")
+    out = finalize_invoice(db, principal, body, idempotency_key)
+    if out.idempotent_replay:
+        response.status_code = status.HTTP_200_OK
+    return out

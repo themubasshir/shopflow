@@ -1,25 +1,25 @@
+import { readSessionToken } from "@/lib/session";
+import { ApiError } from "@/lib/api-client";
+
+export { ApiError, fieldErrors, newIdempotencyKey } from "@/lib/api-client";
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public code: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
+/**
+ * Server-side request helper. The JWT lives in an httpOnly cookie, so only
+ * server code (Server Components and Route Handlers) attaches it.
+ */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await readSessionToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
-    // Read APIs only for Phase 1 - always get fresh data, no cache.
+    // Always fetch fresh data — the POS never wants a cached catalog/invoice.
     cache: "no-store",
   });
   if (!res.ok) {
@@ -28,6 +28,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       body.error ?? `Request failed: ${res.status}`,
       res.status,
       body.code ?? "unknown",
+      body.details ?? {},
     );
   }
   return res.json() as Promise<T>;
@@ -48,6 +49,7 @@ export const api = {
     );
   },
   categories: () => request<import("@/types").CategoryOut[]>("/catalog/categories"),
+  counters: () => request<import("@/types").CounterOut[]>("/counters"),
   customers: () => request<import("@/types").Paginated<import("@/types").CustomerOut>>("/customers"),
   loyaltyAccounts: () =>
     request<import("@/types").Paginated<import("@/types").LoyaltyAccountOut>>("/loyalty/accounts"),

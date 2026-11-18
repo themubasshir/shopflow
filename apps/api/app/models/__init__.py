@@ -1,6 +1,6 @@
 """Import every model so Alembic autogenerate and metadata.create_all see them."""
 
-from app.models.audit import AuditLog, IdempotencyRecord
+from app.models.audit import AuditLog, IdempotencyRecord, InvoiceCounter
 from app.models.catalog import (
     Category,
     MedicineBatch,
@@ -26,6 +26,7 @@ __all__ = [
     "Customer",
     "IdempotencyRecord",
     "Invoice",
+    "InvoiceCounter",
     "InvoiceItem",
     "LoyaltyAccount",
     "LoyaltyRedemption",

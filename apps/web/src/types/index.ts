@@ -152,3 +152,62 @@ export interface InvoiceOut {
   items: InvoiceItemOut[];
   payment_methods: string[];
 }
+
+// ---- Phase 2A: billing write path ------------------------------------------
+
+export interface CounterOut {
+  id: string;
+  code: string;
+  name_en: string;
+  name_bn: string;
+  is_active: boolean;
+}
+
+export interface InvoiceItemCreate {
+  product_id: string;
+  product_unit_id?: string | null;
+  quantity: string;
+  line_discount?: string;
+}
+
+export interface PaymentCreate {
+  method: "cash" | "bkash" | "nagad";
+  amount?: string | null;
+  reference?: string | null;
+}
+
+export interface InvoiceCreate {
+  counter_id: string;
+  customer_id?: string | null;
+  items: InvoiceItemCreate[];
+  discount_total: string;
+  payments: PaymentCreate[];
+}
+
+export interface PaymentOut {
+  id: string;
+  method: string;
+  amount: string;
+  reference: string | null;
+  paid_at: string;
+}
+
+export interface InvoiceCreateOut {
+  id: string;
+  invoice_number: string;
+  status: string;
+  counter_code: string;
+  customer_name: string | null;
+  subtotal: string;
+  discount_total: string;
+  tax_total: string;
+  total: string;
+  paid_total: string;
+  due_total: string;
+  loyalty_points_earned: number;
+  loyalty_points_balance: number | null;
+  finalized_at: string | null;
+  items: InvoiceItemOut[];
+  payments: PaymentOut[];
+  idempotent_replay: boolean;
+}

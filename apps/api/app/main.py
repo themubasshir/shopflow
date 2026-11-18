@@ -6,8 +6,10 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.deps import get_principal  # noqa: F401  (import keeps dependency visible)
 from app.api.v1 import auth, catalog, health, reports, sales
@@ -55,6 +57,56 @@ def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.message, "code": exc.code, "details": exc.details},
+    )
+
+
+# Map HTTP status -> stable machine code so the UI can localize every failure.
+_HTTP_ERROR_CODES = {
+    401: "unauthenticated",
+    403: "forbidden",
+    404: "not_found",
+    409: "conflict",
+    422: "validation_error",
+    429: "rate_limited",
+}
+
+
+@app.exception_handler(StarletteHTTPException)
+def http_error_handler(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Normalize FastAPI/Starlette HTTP errors into the same envelope as AppError."""
+    detail = exc.detail
+    details: dict = {}
+    if isinstance(detail, list):
+        details = {"errors": detail}
+        message = "Request validation failed"
+    else:
+        message = str(detail)
+    code = _HTTP_ERROR_CODES.get(exc.status_code, "http_error")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": message, "code": code, "details": details},
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    """Pydantic validation failures -> 422 with a field-keyed payload."""
+    fields = [
+        {
+            "field": ".".join(str(p) for p in err.get("loc", ()) if p != "body"),
+            "message": err.get("msg", "invalid value"),
+            "type": err.get("type", "value_error"),
+        }
+        for err in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "Request validation failed",
+            "code": "validation_error",
+            "details": {"fields": fields},
+        },
     )
 
 

@@ -20,8 +20,9 @@ shops ─┬─ counters (3 billing counters)
        ├─ invoices ─── invoice_items ─┬─ payments (cash/bkash/nagad/card/due)
        │                              └─ stock_movements (signed qty ledger)
        ├─ stock_movements
+       ├─ invoice_counters    (per-shop daily INV-YYMMDD-NNNN sequence)
        ├─ audit_logs          (who/what/when for sensitive ops)
-       └─ idempotency_records (for Phase-2 write APIs)
+       └─ idempotency_records (request hash per Idempotency-Key)
 ```
 
 ## Key constraints
@@ -34,6 +35,8 @@ shops ─┬─ counters (3 billing counters)
   `quantity_on_hand >= 0`.
 * `invoices`: status CHECK, totals >= 0, `loyalty_discount <= total`,
   unique `shop_id + invoice_number`, unique `shop_id + idempotency_key`.
+* `invoice_counters`: unique `(shop_id, counter_date)`, `last_seq >= 0`;
+  the row is locked `FOR UPDATE` to hand out each day's invoice numbers.
 * `loyalty_accounts`: `points_balance >= 0`,
   `lifetime_earned - lifetime_redeemed = points_balance`.
 * `loyalty_redemptions`: `points_redeemed % 100 = 0`, one redemption per
@@ -58,3 +61,18 @@ redeem: multiples of 100 pts, 100 pts = BDT 100 off,
 no same-invoice earn-and-spend, no expiry in v1,
 returns write a negative `reverse` transaction.
 ```
+
+Phase 2A implements only the **earn** half of this rule on a real bill; the
+unlock/redeem legs stay in `services/loyalty.py` for the redemption phase.
+
+## Invoice numbering
+
+```sql
+invoice_counters (shop_id, counter_date 'YYMMDD', last_seq)
+  → INV-<counter_date>-<last_seq:04d>       e.g. INV-261118-0005
+```
+
+`finalize_invoice` selects the row for today `FOR UPDATE`, so concurrent bills
+serialize on it instead of racing to pick the same number. A day with no row
+starts at 1; the sequence is seeded from the highest existing number for that
+date, so applying the migration to a populated DB never hands out a duplicate.

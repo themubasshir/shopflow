@@ -79,3 +79,38 @@ def get_principal(
         role_code=payload.get("role", "cashier"),
         permissions=frozenset(payload.get("permissions") or []),
     )
+
+
+def require_authenticated(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict:
+    """Dependency for write endpoints: a real JWT is mandatory — no demo fallback."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    try:
+        return decode_access_token(credentials.credentials)
+    except TokenError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+def get_authenticated_principal(
+    payload: dict = Depends(require_authenticated),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Resolve a Principal strictly from a valid JWT, and verify the user is
+    still an active member of the claimed shop."""
+    user = db.get(User, uuid.UUID(payload["sub"]))
+    if user is None or not user.is_active or str(user.shop_id) != payload.get("shop_id"):
+        raise HTTPException(status_code=401, detail="Invalid or inactive account")
+    role = db.get(Role, user.role_id)
+    return Principal(
+        user_id=user.id,
+        shop_id=user.shop_id,
+        email=user.email,
+        name=user.name,
+        role_code=role.code if role else payload.get("role", "cashier"),
+        permissions=frozenset((role.permissions if role else []) or []),
+    )

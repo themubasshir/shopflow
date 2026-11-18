@@ -64,7 +64,54 @@ async def test_login_rejects_bad_credentials(client):
 
 
 @pytest.mark.anyio
+async def test_login_error_uses_standard_envelope(client):
+    """Every error response carries {error, code, details} for UI translation."""
+    r = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "nobody@shopflow.dev", "password": "wrong-password"},
+    )
+    body = r.json()
+    assert set(body) == {"error", "code", "details"}
+    assert body["code"] == "unauthenticated"
+
+
+@pytest.mark.anyio
+async def test_validation_error_envelope(client):
+    r = await client.post("/api/v1/auth/login", json={"email": "x"})
+    assert r.status_code == 422
+    body = r.json()
+    assert body["code"] == "validation_error"
+    fields = {f["field"] for f in body["details"]["fields"]}
+    assert "password" in fields
+
+
+@pytest.mark.anyio
+async def test_invoice_write_requires_auth(client):
+    r = await client.post(
+        "/api/v1/invoices",
+        json={
+            "counter_id": "00000000-0000-0000-0000-000000000000",
+            "items": [],
+            "payments": [{"method": "cash"}],
+        },
+        headers={"Idempotency-Key": "test-unauth-key"},
+    )
+    assert r.status_code == 401
+    assert r.json()["code"] == "unauthenticated"
+
+
+@pytest.mark.anyio
 async def test_openapi_served(client):
     r = await client.get("/openapi.json")
     assert r.status_code == 200
     assert r.json()["info"]["title"] == "ShopFlow API"
+
+
+@pytest.mark.anyio
+async def test_openapi_documents_invoice_create(client):
+    """The billing write path is part of the published contract."""
+    spec = (await client.get("/openapi.json")).json()
+    post = spec["paths"]["/api/v1/invoices"]["post"]
+    assert post["responses"]["201"]["content"]["application/json"]["schema"]
+    header_names = {p["name"] for p in post["parameters"]}
+    assert "Idempotency-Key" in header_names

@@ -106,6 +106,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/counters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Counters
+         * @description Active checkout counters for the caller's shop (billing screen).
+         */
+        get: operations["list_counters_api_v1_counters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -150,7 +170,13 @@ export interface paths {
         /** List Invoices */
         get: operations["list_invoices_api_v1_invoices_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Invoice
+         * @description Finalize a bill atomically: stock deduction, payment, loyalty earn and
+         *     the idempotency record all commit — or roll back — together. Cashier
+         *     identity comes from the JWT; counter must belong to the caller's shop.
+         */
+        post: operations["create_invoice_api_v1_invoices_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -205,6 +231,22 @@ export interface components {
             total_sales: string;
             /** Is Busy */
             is_busy: boolean;
+        };
+        /** CounterOut */
+        CounterOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Name En */
+            name_en: string;
+            /** Name Bn */
+            name_bn: string;
+            /** Is Active */
+            is_active: boolean;
         };
         /** CustomerOut */
         CustomerOut: {
@@ -310,6 +352,89 @@ export interface components {
             environment: string;
             /** Version */
             version: string;
+        };
+        /** InvoiceCreate */
+        InvoiceCreate: {
+            /**
+             * Counter Id
+             * Format: uuid
+             */
+            counter_id: string;
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Items */
+            items: components["schemas"]["InvoiceItemCreate"][];
+            /**
+             * Discount Total
+             * @default 0
+             */
+            discount_total: number | string;
+            /** Payments */
+            payments: components["schemas"]["PaymentCreate"][];
+        };
+        /** InvoiceCreateOut */
+        InvoiceCreateOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Invoice Number */
+            invoice_number: string;
+            /** Status */
+            status: string;
+            /** Counter Code */
+            counter_code: string;
+            /** Customer Name */
+            customer_name: string | null;
+            /** Subtotal */
+            subtotal: string;
+            /** Discount Total */
+            discount_total: string;
+            /** Tax Total */
+            tax_total: string;
+            /** Total */
+            total: string;
+            /** Paid Total */
+            paid_total: string;
+            /** Due Total */
+            due_total: string;
+            /** Loyalty Points Earned */
+            loyalty_points_earned: number;
+            /** Loyalty Points Balance */
+            loyalty_points_balance: number | null;
+            /** Finalized At */
+            finalized_at: string | null;
+            /** Items */
+            items: components["schemas"]["InvoiceItemOut"][];
+            /** Payments */
+            payments: components["schemas"]["PaymentOut"][];
+            /**
+             * Idempotent Replay
+             * @default false
+             */
+            idempotent_replay: boolean;
+        };
+        /**
+         * InvoiceItemCreate
+         * @description One cart line. Prices are NEVER accepted from the client — the server
+         *     resolves the authoritative price from the product's sellable unit.
+         */
+        InvoiceItemCreate: {
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Unit Id */
+            product_unit_id?: string | null;
+            /** Quantity */
+            quantity: number | string;
+            /**
+             * Line Discount
+             * @default 0
+             */
+            line_discount: number | string;
         };
         /** InvoiceItemOut */
         InvoiceItemOut: {
@@ -492,6 +617,34 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** PaymentCreate */
+        PaymentCreate: {
+            /** Method */
+            method: string;
+            /** Amount */
+            amount?: number | string | null;
+            /** Reference */
+            reference?: string | null;
+        };
+        /** PaymentOut */
+        PaymentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Method */
+            method: string;
+            /** Amount */
+            amount: string;
+            /** Reference */
+            reference: string | null;
+            /**
+             * Paid At
+             * Format: date-time
+             */
+            paid_at: string;
         };
         /** ProductOut */
         ProductOut: {
@@ -750,6 +903,26 @@ export interface operations {
             };
         };
     };
+    list_counters_api_v1_counters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CounterOut"][];
+                };
+            };
+        };
+    };
     list_customers_api_v1_customers_get: {
         parameters: {
             query?: {
@@ -834,6 +1007,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Paginated_InvoiceOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invoice_api_v1_invoices_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceCreateOut"];
                 };
             };
             /** @description Validation Error */

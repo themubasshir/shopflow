@@ -1,4 +1,4 @@
-# ShopFlow architecture — Phase 1
+# ShopFlow architecture
 
 ## Modular monolith
 
@@ -13,33 +13,78 @@ app/
   db/        engine, session, Base + naming conventions
   models/    SQLAlchemy 2 models grouped by domain (shop/catalog/inventory/sales/loyalty/audit)
   schemas/   Pydantic request/response models
-  services/  pure business rules (loyalty is the only one in Phase 1)
+  services/  pure business rules + the billing transaction (loyalty, billing)
   api/       deps (auth principal) + v1 routers
 ```
 
 ## Request flow
 
+Reads (server components):
+
 ```
 Next.js [locale] page (server component)
-   └─ fetch() → lib/api.ts (no-store, typed)
+   └─ fetch() → lib/api.ts (httpOnly cookie → Authorization, no-store, typed)
         └─ FastAPI router → sqlalchemy Session → PostgreSQL 17 shopflow_dev
 ```
 
-* The frontend never opens a DB connection.
+Writes (browser → same-origin proxy → API):
+
+```
+billing-client.tsx (client component)
+   └─ POST /api/billing/invoices  (Next route handler, same origin)
+        └─ attaches Authorization from the httpOnly cookie
+             └─ FastAPI POST /invoices → finalize_invoice() → PostgreSQL
+```
+
+* The frontend never opens a DB connection, and the browser never holds the JWT.
 * Every response is a Pydantic schema → OpenAPI → `packages/contracts/api.generated.ts`.
 * Errors bubble through `AppError` subclasses → consistent `{error, code, details}` JSON.
+  FastAPI's own `HTTPException` and Pydantic `RequestValidationError` are normalized
+  into the same envelope in `main.py`, so the UI can translate every failure by `code`.
 
-## Auth (Phase 1)
+## Auth
 
 `deps.get_principal` returns a `Principal`:
 
 * **Demo mode** (no `Authorization` header): the seeded manager on the
-  seeded shop — enough for Phase 1 read APIs.
+  seeded shop — enough for the read APIs.
 * **JWT mode**: `POST /auth/login` verifies argon2 hash and returns an
   HS256 token carrying `sub`, `shop_id`, `role`, `permissions[]`.
 
 RBAC lives in `roles.permissions` (string array). `Principal.require()`
 raises 403 for missing permissions.
+
+**Write endpoints use `get_authenticated_principal`**, which has no demo
+fallback: `POST /invoices` returns 401 without a real token, so a client can
+never invent a cashier or counter identity. The web app stores the token in an
+httpOnly, same-site cookie (`shopflow_token`) via `POST /api/auth`; server
+components read it with `lib/session.ts`, and the cart's write goes through the
+`/api/billing/invoices` route handler which attaches `Authorization` upstream.
+
+## Billing transaction (Phase 2A)
+
+`POST /invoices` → `app/services/billing.finalize_invoice` runs one atomic
+transaction. Either everything below commits, or nothing does:
+
+1. **Idempotency** — the `Idempotency-Key` header plus a request hash is stored
+   in `idempotency_records`. Replaying the same key with the same payload returns
+   the original invoice (200, `idempotent_replay: true`); the same key with a
+   different payload is a 409 `idempotency_conflict`.
+2. **Lock products in a deterministic order** — `SELECT product.id ... FOR UPDATE`
+   ordered by id, so two concurrent bills touching the same products can never
+   deadlock and stock can't be oversold.
+3. **Price server-side** — line totals and invoice totals are computed from DB
+   prices with `Decimal`. Client-supplied prices are never trusted.
+4. **Allocate the invoice number** — `invoice_counters` (`shop_id`,
+   `counter_date` YYMMDD, `last_seq`) is locked `FOR UPDATE` and incremented,
+   producing `INV-YYMMDD-NNNN` with no gaps or duplicates.
+5. **Deduct stock, write `stock_movements`, payments, loyalty earn** — customers
+   earn `floor(eligible_amount / 100)` points once, after finalize; no redemption
+   in Phase 2A.
+
+`InsufficientStockError` (409 `insufficient_stock`) carries the requested and
+available quantity in `details`; it is raised before any write, so a rejected
+bill leaves stock, counters and loyalty untouched.
 
 ## Money & loyalty rules
 
@@ -72,5 +117,5 @@ legibility. `preferred_locale` is already on `users` for Phase 2.
   DB password were generated locally and are not in git.
 * Argon2id hashing, timing-safe `verify_password` for unknown users.
 * CORS is a whitelist; request IDs added per request for audit trails.
-* `audit_logs` + `idempotency_records` tables are in place for Phase 2
-  write APIs (billing finalize, stock adjust, loyalty redeem).
+* `audit_logs` records every invoice write; `idempotency_records` makes the
+  billing write replay-safe.

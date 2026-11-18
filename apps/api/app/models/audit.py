@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -64,3 +64,20 @@ class IdempotencyRecord(UUIDPrimaryKeyMixin, Base):
             unique=True,
         ),
     )
+
+
+class InvoiceCounter(Base):
+    """Per-shop daily sequence for server-generated invoice numbers.
+
+    Row is locked FOR UPDATE inside the invoice transaction so concurrent
+    counters always receive distinct, gap-free-for-that-day numbers without
+    colliding on the unique (shop_id, invoice_number) index.
+    """
+
+    __tablename__ = "invoice_counters"
+
+    shop_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE"), primary_key=True
+    )
+    counter_date: Mapped[str] = mapped_column(String(8), primary_key=True)
+    last_seq: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")

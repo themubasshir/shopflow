@@ -43,3 +43,13 @@ class PermissionDeniedError(AppError):
 class LoyaltyError(AppError):
     status_code = 409
     code = "loyalty_rule_violation"
+
+
+class InsufficientStockError(AppError):
+    status_code = 409
+    code = "insufficient_stock"
+
+
+class IdempotencyConflictError(AppError):
+    status_code = 409
+    code = "idempotency_conflict"
