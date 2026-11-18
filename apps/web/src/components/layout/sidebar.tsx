@@ -1,21 +1,33 @@
 import { Receipt } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { NavItem } from "./nav-item";
+import { hasPermission } from "@/lib/session";
+import type { Me } from "@/lib/session";
 import type { Locale } from "@/i18n/config";
 
-const ITEMS = [
+/**
+ * Nav model. `permission` is the API permission required to see the item; when
+ * omitted the item is part of the common set every signed-in user gets.
+ */
+const ITEMS: { key: string; href: string; permission?: string }[] = [
   { key: "dashboard", href: "" },
   { key: "billing", href: "/billing" },
   { key: "inventory", href: "/inventory" },
   { key: "customers", href: "/customers" },
   { key: "loyalty", href: "/loyalty" },
-  { key: "reports", href: "/reports" },
+  { key: "reports", href: "/reports", permission: "reports:read" },
+  { key: "employees", href: "/employees", permission: "employees:manage" },
+  { key: "counters", href: "/counters", permission: "counters:manage" },
   { key: "settings", href: "/settings" },
-] as const;
+];
 
-export async function Sidebar({ locale }: { locale: Locale }) {
+export async function Sidebar({ locale, me }: { locale: Locale; me: Me }) {
   const t = await getTranslations({ locale, namespace: "nav" });
   const tApp = await getTranslations({ locale, namespace: "app" });
+
+  const items = ITEMS.filter(
+    (item) => !item.permission || hasPermission(me, item.permission),
+  );
 
   return (
     <aside
@@ -32,7 +44,7 @@ export async function Sidebar({ locale }: { locale: Locale }) {
         </div>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Main">
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <NavItem
             key={item.key}
             href={item.href}

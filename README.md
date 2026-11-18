@@ -59,16 +59,43 @@ npm run dev   # http://localhost:3000 → redirects to /en
 
 Ports: web **3000**, API **8001** (8000 was occupied on this machine).
 
+## Staff logins (dev seed, password `ShopFlow#Dev123`)
+
+| Email | Role | Counters |
+|---|---|---|
+| `owner@shopflow.dev` | OWNER — everything incl. employee/counter mgmt | all |
+| `manager@shopflow.dev` | MANAGER — operations, no admin grants | all |
+| `cashier1@shopflow.dev` | CASHIER — billing + lookup | C1 |
+| `cashier2@shopflow.dev` | CASHIER — billing + lookup | C2 |
+
+## Test database
+
+Automated tests run against a dedicated **`shopflow_test`** database — never
+`shopflow_dev`. Create + provision it once:
+
+```powershell
+cd apps\api
+$env:PYTHONPATH='.'
+$env:DATABASE_URL='postgresql+psycopg://shopflow_app:<pw>@localhost:5432/shopflow_test'
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe database\seeds\seed.py
+```
+
+`tests/conftest.py` swaps `SessionLocal` and the `get_db` dependency to the
+test DB and aborts if the URL targets anything else. `scripts/reset_test_db.py`
+resets it safely (refuses non-test targets).
+
 ## Quality gates that pass
 
 - `npm run typecheck`, `npm run lint`, `npm run build`
 - `ruff check` + `ruff format` on `app`, `tests`, `database/seeds`
-- `pytest` — 35 tests (loyalty rules, auth/JWT, API shape)
+- `pytest` — 75 tests (loyalty rules, auth/JWT, API shape, RBAC & counter authz)
 - Alembic `upgrade head` on `shopflow_dev`
 - Playwright screenshots at 375/768/1024/1440 in `docs/screenshots/`
 
 ## Demo vs real data
 
-Everything you see in Phase 1 is labelled demo data (`is_demo` flag +
-"Demo data" badge). No production billing, stock, or loyalty writes are
-implemented yet.
+Phase 2B adds real auth + RBAC + counter management on top of the demo seed.
+Reads without a token still fall back to a demo manager only while
+`settings.demo_mode` is on; writes always require a live session. Catalogue
+data remains labelled demo (`is_demo` flag + "Demo data" badge).

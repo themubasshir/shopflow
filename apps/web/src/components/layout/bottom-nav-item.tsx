@@ -7,6 +7,11 @@ import {
   Receipt,
   Package,
   Users,
+  Gift,
+  BarChart3,
+  Settings,
+  UserCog,
+  MonitorSmartphone,
   MoreHorizontal,
   type LucideIcon,
 } from "lucide-react";
@@ -17,6 +22,11 @@ const ICONS: Record<string, LucideIcon> = {
   billing: Receipt,
   inventory: Package,
   customers: Users,
+  loyalty: Gift,
+  reports: BarChart3,
+  employees: UserCog,
+  counters: MonitorSmartphone,
+  settings: Settings,
   more: MoreHorizontal,
 };
 

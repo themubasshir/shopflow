@@ -11,7 +11,15 @@
     "customers": "Customers",
     "loyalty": "Loyalty",
     "reports": "Sales Reports",
-    "settings": "Settings"
+    "employees": "Employees",
+    "counters": "Counters",
+    "settings": "Settings",
+    "more": "More",
+    "roles": {
+      "owner": "Owner",
+      "manager": "Manager",
+      "cashier": "Cashier"
+    }
   },
   "actions": {
     "newBill": "New Bill",
@@ -178,5 +186,108 @@
     "bdt": "৳",
     "seeAll": "See all",
     "demo": "Demo"
+  },
+  "login": {
+    "title": "Sign in to ShopFlow",
+    "subtitle": "Use your staff account to open the POS.",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "errors": {
+      "unauthenticated": "Wrong email or password",
+      "forbidden": "This account is disabled — ask the owner",
+      "rate_limited": "Too many attempts — wait a moment and try again",
+      "validation_error": "Enter your email and password",
+      "network": "Can't reach the server — check your connection",
+      "unknown": "Something went wrong — please try again"
+    }
+  },
+  "account": {
+    "changePassword": "Change password",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "done": "Done",
+    "passwordChanged": "Password updated successfully.",
+    "errors": {
+      "unauthenticated": "Current password is wrong — try again",
+      "forbidden": "You don't have permission to do that",
+      "validation_error": "Check the fields and try again",
+      "network": "Can't reach the server — check your connection",
+      "unknown": "Something went wrong — please try again"
+    }
+  },
+  "employees": {
+    "title": "Employees",
+    "subtitle": "Staff accounts, roles & counter access",
+    "add": "Add employee",
+    "addTitle": "Add employee",
+    "editTitle": "Edit employee",
+    "colName": "Name",
+    "colEmail": "Email",
+    "colRole": "Role",
+    "colCounters": "Counters",
+    "colStatus": "Status",
+    "colLastLogin": "Last login",
+    "colActions": "Actions",
+    "active": "Active",
+    "disabled": "Disabled",
+    "allCounters": "All counters",
+    "edit": "Edit",
+    "disable": "Disable",
+    "enable": "Enable",
+    "assignCounters": "Counters",
+    "resetPassword": "Reset password",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "role": "Role",
+    "prefLocale": "Language",
+    "password": "Password",
+    "newPassword": "New password",
+    "counters": "Counter access",
+    "counterHint": "Leave empty for unrestricted access (owner/manager).",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "working": "Working…",
+    "disableTitle": "Disable employee",
+    "enableTitle": "Enable employee",
+    "disableBody": "Disable {name}? They won't be able to sign in until re-enabled.",
+    "enableBody": "Re-enable {name}? They'll be able to sign in again.",
+    "resetTitle": "Reset password — {name}",
+    "countersTitle": "Counter access — {name}",
+    "errors": {
+      "unauthenticated": "Please sign in again",
+      "forbidden": "You don't have permission to manage staff",
+      "validation_error": "Check the fields and try again",
+      "conflict": "That email is already in use",
+      "not_found": "Employee not found",
+      "network": "Can't reach the server — check your connection",
+      "unknown": "Something went wrong — please try again"
+    }
+  },
+  "counterMgmt": {
+    "title": "Counters",
+    "subtitle": "Activate or deactivate billing counters",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate counter",
+    "deactivate": "Deactivate counter",
+    "assignedStaff": "Assigned staff",
+    "noStaff": "No staff assigned",
+    "errors": {
+      "unauthenticated": "Please sign in again",
+      "forbidden": "You don't have permission to manage counters",
+      "validation_error": "Check the fields and try again",
+      "not_found": "Counter not found",
+      "network": "Can't reach the server — check your connection",
+      "unknown": "Something went wrong — please try again"
+    }
   }
 }

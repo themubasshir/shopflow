@@ -4,7 +4,6 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { Plus_Jakarta_Sans, Noto_Sans_Bengali } from "next/font/google";
 import { locales, type Locale } from "@/i18n/config";
-import { AppShell } from "@/components/layout/app-shell";
 import "../globals.css";
 
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans" });
@@ -25,6 +24,11 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
+/**
+ * Root layout for the locale segment. Kept minimal: the (app) route group adds
+ * the authenticated shell and the (auth) group adds its own centered chrome, so
+ * neither shell leaks into the other.
+ */
 export default async function LocaleLayout({
   children,
   params,
@@ -41,7 +45,7 @@ export default async function LocaleLayout({
     <html lang={locale} className={`${jakarta.variable} ${bengali.variable}`}>
       <body>
         <NextIntlClientProvider messages={messages} locale={locale}>
-          <AppShell locale={locale as Locale}>{children}</AppShell>
+          {children}
         </NextIntlClientProvider>
       </body>
     </html>

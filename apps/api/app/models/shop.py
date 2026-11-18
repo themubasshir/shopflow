@@ -116,3 +116,64 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("preferred_locale IN ('en', 'bn')", name="preferred_locale_valid"),
         Index("ix_users_shop_id_is_active", "shop_id", "is_active"),
     )
+
+
+class UserCounter(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Assignment of an employee to a checkout counter (Phase 2B).
+
+    A cashier can only bill at counters they are assigned to; owners and
+    managers may bill at any active counter. ``POST /invoices`` verifies this
+    server-side — the counter id arriving in the request body is never trusted.
+    """
+
+    __tablename__ = "user_counters"
+
+    shop_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    counter_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("counters.id", ondelete="CASCADE"), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "counter_id", name="uq_user_counters_user_counter"),
+        Index("ix_user_counters_user_id", "user_id"),
+        Index("ix_user_counters_counter_id", "counter_id"),
+    )
+
+
+class AuthSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """One row per issued access token, keyed by the JWT ``jti`` (Phase 2B).
+
+    JWTs are self-contained and expire only by their ``exp`` claim; this table
+    gives ShopFlow a server-side handle so logout and account-disable can
+    revoke a live token immediately instead of trusting it until expiry.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    shop_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # The session id embedded in the token's `jti` claim.
+    jti: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    counter_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("counters.id", ondelete="SET NULL")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ip_address: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index("ix_auth_sessions_user_id", "user_id"),
+        Index("ix_auth_sessions_shop_id_user_id", "shop_id", "user_id"),
+        Index("ix_auth_sessions_expires_at", "expires_at"),
+    )

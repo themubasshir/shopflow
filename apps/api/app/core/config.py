@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     default_locale: str = "en"
     demo_data: bool = True
 
+    # When enabled, unauthenticated read endpoints fall back to a demo manager
+    # principal (Phase 1 behaviour). Write endpoints never use it. Flip off for
+    # production so every request is authenticated.
+    demo_mode: bool = True
+
+    # Brute-force login protection: per identity+IP sliding window.
+    login_rate_limit_attempts: int = 5
+    login_rate_limit_window_seconds: int = 300
+
     @field_validator("default_locale")
     @classmethod
     def validate_locale(cls, value: str) -> str:

@@ -17,10 +17,11 @@ from app.models.loyalty import (
     LoyaltyTransaction,
 )
 from app.models.sales import Customer, Invoice, InvoiceItem, Payment
-from app.models.shop import Counter, Role, Shop, User
+from app.models.shop import AuthSession, Counter, Role, Shop, User, UserCounter
 
 __all__ = [
     "AuditLog",
+    "AuthSession",
     "Category",
     "Counter",
     "Customer",
@@ -44,4 +45,5 @@ __all__ = [
     "StockMovement",
     "Supplier",
     "User",
+    "UserCounter",
 ]

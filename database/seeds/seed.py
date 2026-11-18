@@ -22,6 +22,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps" / "api"))
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.core.permissions import (
+    CASHIER_PERMISSIONS,
+    MANAGER_PERMISSIONS,
+    OWNER_PERMISSIONS,
+)
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models import (
@@ -43,6 +48,7 @@ from app.models import (
     StockMovement,
     Supplier,
     User,
+    UserCounter,
 )
 
 rng = random.Random(42)
@@ -85,21 +91,20 @@ def seed(db) -> None:
     ]
     db.add_all(counters)
 
+    owner_role = Role(
+        shop_id=shop.id,
+        code="owner",
+        name_en="Shop Owner",
+        name_bn="দোকান মালিক",
+        permissions=OWNER_PERMISSIONS,
+        is_system=True,
+    )
     manager_role = Role(
         shop_id=shop.id,
         code="manager",
         name_en="Shop Manager",
         name_bn="দোকান ম্যানেজার",
-        permissions=[
-            "catalog:read",
-            "catalog:write",
-            "sales:read",
-            "sales:write",
-            "reports:read",
-            "loyalty:read",
-            "loyalty:write",
-            "settings:write",
-        ],
+        permissions=MANAGER_PERMISSIONS,
         is_system=True,
     )
     cashier_role = Role(
@@ -107,14 +112,24 @@ def seed(db) -> None:
         code="cashier",
         name_en="Cashier",
         name_bn="ক্যাশিয়ার",
-        permissions=["sales:read", "sales:write", "catalog:read"],
+        permissions=CASHIER_PERMISSIONS,
         is_system=True,
     )
-    db.add_all([manager_role, cashier_role])
+    db.add_all([owner_role, manager_role, cashier_role])
     db.flush()
 
     pw = hash_password("ShopFlow#Dev123")
     users = [
+        User(
+            shop_id=shop.id,
+            role_id=owner_role.id,
+            name="Jamal Hossain",
+            email="owner@shopflow.dev",
+            phone="+8801700000000",
+            password_hash=pw,
+            preferred_locale="en",
+            is_active=True,
+        ),
         User(
             shop_id=shop.id,
             role_id=manager_role.id,
@@ -135,8 +150,30 @@ def seed(db) -> None:
             preferred_locale="bn",
             is_active=True,
         ),
+        User(
+            shop_id=shop.id,
+            role_id=cashier_role.id,
+            name="Karim Sheikh",
+            email="cashier2@shopflow.dev",
+            phone="+8801744444444",
+            password_hash=pw,
+            preferred_locale="en",
+            is_active=True,
+        ),
     ]
     db.add_all(users)
+    db.flush()
+
+    # Assign each cashier to a counter. Cashiers can only bill where assigned.
+    # C1 -> cashier1, C2 -> cashier2, C3 left unassigned (any owner/manager can use).
+    cashier1 = users[2]
+    cashier2 = users[3]
+    db.add_all(
+        [
+            UserCounter(shop_id=shop.id, user_id=cashier1.id, counter_id=counters[0].id),
+            UserCounter(shop_id=shop.id, user_id=cashier2.id, counter_id=counters[1].id),
+        ]
+    )
     db.flush()
 
     grocery = Category(

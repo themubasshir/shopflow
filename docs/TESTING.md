@@ -70,6 +70,64 @@ thread/session — it exercises the `SELECT ... FOR UPDATE` locks, not a mock.
 | missing Idempotency-Key | 422 | `validation_error` |
 | no `Authorization` header | 401 | `unauthenticated` |
 
+## Phase 2B — auth, RBAC & counter management
+
+| Check | Result |
+|---|---|
+| `ruff check app tests database\seeds` | clean |
+| `pytest` | **75 passed** (57 prior + 18 new authz/auth cases) |
+| `alembic upgrade head` | `92eeb64fd2a9` (user_counters + auth_sessions) |
+| dedicated `shopflow_test` | all tests run against it, never `shopflow_dev` |
+
+### Test DB isolation
+
+* `tests/conftest.py` builds `TestingSessionLocal` bound to `shopflow_test`,
+  swaps `app.db.session.SessionLocal`/`engine` **and** the FastAPI `get_db`
+  dependency before the app imports, and hard-aborts if the URL is not a
+  `*test*` database (it refuses `shopflow_dev`/`prod` anywhere in the URL).
+* `scripts/reset_test_db.py` is the safeguarded dev-only reset utility — it
+  drops/recreates only a `*test*` database and refuses any non-test target,
+  replacing the ad-hoc Phase 2A cleanup script.
+
+### Authorization matrix tests (`tests/test_rbac.py`, 18 cases)
+
+login success / wrong-password / me reflects role / owner unrestricted /
+logout invalidates / disable kills live session / disabled cannot login /
+concurrent sessions independent / rate-limit 429 / cashier→employees 403 /
+cashier→counters 403 / manager→employees 403 / manager→counters 403 /
+owner→employees 200 / cashier unassigned-counter 403 / cashier history
+scoped / manager full history / change-password revokes other sessions.
+
+### Verified over real HTTP (:8001)
+
+| Request | Result |
+|---|---|
+| `GET /auth/me` cashier1 | `assigned_counter_ids` = C1 only |
+| cashier → `GET /employees` / `/manage/counters` | `403 forbidden` |
+| manager → `GET /employees` / `PATCH counter` | `403 forbidden` |
+| owner → `GET /employees` | `200`, no password hashes |
+| cashier1 → `POST /invoices` @ C2 (unassigned) | `403 Not assigned to this counter` |
+| cashier1 → `POST /invoices` @ C1 (assigned) | `201` invoice created |
+| cashier1 → `GET /invoices` | only `C1` history |
+| manager → `GET /invoices` | `C1`,`C2`,`C3` |
+| `POST /auth/logout` then `/me` | `401 unauthenticated` |
+| 6 bad logins | `429 rate_limited` |
+
+### Verified in the browser (Playwright, :3000)
+
+| Flow | Result |
+|---|---|
+| `/en/billing` unauthenticated | redirects to `/en/login` |
+| bad credentials | localized `Wrong email or password`, stays on `/login` |
+| owner login | → `/en` dashboard, Employees + Counters in nav |
+| cashier1 login | → `/en`, nav hides Reports/Employees/Counters |
+| cashier → `/en/employees` | redirected away (permission gate) |
+| `/bn/login` | fully localized Bangla form |
+| mobile 375px login | renders correctly |
+
+Screenshots: `docs/screenshots/p2b-*.png` (login EN/BN, owner dashboard +
+employees + counters, cashier-scoped dashboard, mobile login).
+
 ## Known limitations
 
 * Demo-only data (`is_demo` flag + badge).

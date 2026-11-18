@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import Principal, get_authenticated_principal, get_principal
+from app.api.deps import (
+    Principal,
+    assert_counter_allowed,
+    get_authenticated_principal,
+    get_principal,
+)
 from app.db.session import get_db
 from app.models import Counter, Customer, Invoice, LoyaltyAccount
 from app.schemas.common import Paginated
@@ -122,6 +127,12 @@ def list_invoices(
         .join(Counter, Invoice.counter_id == Counter.id)
         .where(Invoice.shop_id == principal.shop_id)
     )
+    # Cashiers (and anyone restricted to assigned counters) only see the
+    # invoice history for their own counters — not the whole shop's book.
+    if principal.assigned_counter_ids is not None:
+        if not principal.assigned_counter_ids:
+            return Paginated(items=[], total=0, limit=limit, offset=offset)
+        stmt = stmt.where(Invoice.counter_id.in_(principal.assigned_counter_ids))
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.execute(
         stmt.options(selectinload(Invoice.items), selectinload(Invoice.payments))
@@ -172,6 +183,9 @@ def create_invoice(
     the idempotency record all commit — or roll back — together. Cashier
     identity comes from the JWT; counter must belong to the caller's shop."""
     principal.require("sales:write")
+    # Server-side counter authorization: the client-sent counter id is never
+    # trusted — a cashier can only bill at a counter they are assigned to.
+    assert_counter_allowed(principal, body.counter_id)
     out = finalize_invoice(db, principal, body, idempotency_key)
     if out.idempotent_replay:
         response.status_code = status.HTTP_200_OK

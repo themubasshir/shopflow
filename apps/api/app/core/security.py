@@ -46,6 +46,7 @@ def create_access_token(
     shop_id: str,
     role: str,
     permissions: list[str],
+    session_id: str | None = None,
     expires_minutes: int | None = None,
 ) -> str:
     now = datetime.now(UTC)
@@ -59,6 +60,10 @@ def create_access_token(
         "iat": int(now.timestamp()),
         "exp": int(expires.timestamp()),
     }
+    # jti ties the token to an auth_sessions row so logout / account disable
+    # can revoke it before the (long) access-token lifetime would expire.
+    if session_id:
+        payload["jti"] = session_id
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
 

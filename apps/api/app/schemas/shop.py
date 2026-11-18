@@ -44,6 +44,11 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -57,6 +62,8 @@ class MeOut(ORMModel):
     preferred_locale: str
     role: str
     permissions: list[str]
+    assigned_counter_ids: list[str] | None = None
+    is_demo: bool = False
 
 
 class RecentTransaction(BaseModel):
@@ -68,3 +75,59 @@ class RecentTransaction(BaseModel):
     method: str | None
     finalized_at: datetime | None
     status: str
+
+
+# --- Phase 2B: employee + counter management -------------------------------
+
+
+class RoleOut(ORMModel):
+    id: UUID
+    code: str
+    name_en: str
+    name_bn: str
+
+
+class EmployeeOut(ORMModel):
+    id: UUID
+    name: str
+    email: str
+    phone: str | None
+    role_code: str
+    role_name_en: str
+    role_name_bn: str
+    is_active: bool
+    preferred_locale: str
+    last_login_at: datetime | None
+    assigned_counter_ids: list[UUID]
+    created_at: datetime
+
+
+class EmployeeCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    phone: str | None = Field(default=None, max_length=32)
+    role_id: UUID
+    password: str = Field(min_length=8, max_length=128)
+    preferred_locale: str = Field(default="en", pattern="^(en|bn)$")
+    counter_ids: list[UUID] = Field(default_factory=list)
+
+
+class EmployeeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    phone: str | None = Field(default=None, max_length=32)
+    role_id: UUID | None = None
+    preferred_locale: str | None = Field(default=None, pattern="^(en|bn)$")
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class CounterAssignRequest(BaseModel):
+    counter_ids: list[UUID] = Field(default_factory=list)
+
+
+class CounterUpdate(BaseModel):
+    is_active: bool
+    name_en: str | None = Field(default=None, min_length=1, max_length=80)
+    name_bn: str | None = Field(default=None, min_length=1, max_length=80)

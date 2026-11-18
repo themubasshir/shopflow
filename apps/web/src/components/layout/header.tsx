@@ -2,9 +2,11 @@ import { ShoppingCart } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { LanguageSwitcher } from "./language-switcher";
+import { AccountMenu } from "./account-menu";
+import type { Me } from "@/lib/session";
 import type { Locale } from "@/i18n/config";
 
-export async function Header({ locale }: { locale: Locale }) {
+export async function Header({ locale, me }: { locale: Locale; me: Me }) {
   const t = await getTranslations({ locale, namespace: "actions" });
   const tApp = await getTranslations({ locale, namespace: "app" });
 
@@ -26,6 +28,7 @@ export async function Header({ locale }: { locale: Locale }) {
           {t("newBill")}
         </Link>
         <LanguageSwitcher locale={locale} />
+        <AccountMenu me={me} />
       </div>
     </header>
   );

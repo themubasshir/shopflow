@@ -18,6 +18,21 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+def make_session_factory(database_url: str) -> sessionmaker[Session]:
+    """Build an isolated Session factory for an explicit database URL.
+
+    Used by the test-suite to point the app at ``shopflow_test`` so nothing
+    the tests do can touch the development (or production) database.
+    """
+    test_engine = create_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=5,
+    )
+    return sessionmaker(bind=test_engine, autoflush=False, expire_on_commit=False)
+
+
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:

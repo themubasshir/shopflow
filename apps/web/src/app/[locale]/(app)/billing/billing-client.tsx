@@ -9,8 +9,6 @@ import {
   Trash2,
   CheckCircle2,
   AlertTriangle,
-  LogIn,
-  LogOut,
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -43,25 +41,17 @@ function parseDecimal(value: string | null | undefined): number {
 
 export function BillingClient({
   locale,
-  signedIn,
   products,
   counters,
   customers,
 }: {
   locale: Locale;
-  signedIn: boolean;
   products: ProductOut[];
   counters: CounterOut[];
   customers: CustomerOut[];
 }) {
   const t = useTranslations("billing");
   const router = useRouter();
-
-  // ----- session / sign-in -------------------------------------------------
-  const [authed, setAuthed] = useState(signedIn);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [signingIn, setSigningIn] = useState(false);
 
   // ----- cart state --------------------------------------------------------
   const [query, setQuery] = useState("");
@@ -107,8 +97,7 @@ export function BillingClient({
   );
   const discountNum = Math.max(0, parseDecimal(discount));
   const total = Math.max(0, subtotal - discountNum);
-  const canSubmit =
-    authed && cart.length > 0 && counterId !== "" && total > 0 && !submitting;
+  const canSubmit = cart.length > 0 && counterId !== "" && total > 0 && !submitting;
 
   // ----- cart ops ----------------------------------------------------------
   function addToCart(product: ProductOut) {
@@ -153,42 +142,6 @@ export function BillingClient({
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }
 
-  // ----- session ------------------------------------------------------------
-  async function signIn(e: React.FormEvent) {
-    e.preventDefault();
-    setSigningIn(true);
-    setErrorCode(null);
-    try {
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "login", email, password }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setErrorCode(body.code ?? "unauthenticated");
-        return;
-      }
-      setAuthed(true);
-      setPassword("");
-    } catch {
-      setErrorCode("network");
-    } finally {
-      setSigningIn(false);
-    }
-  }
-
-  async function signOut() {
-    await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "logout" }),
-    }).catch(() => {});
-    setAuthed(false);
-    resetBill();
-    router.refresh();
-  }
-
   // ----- submit -------------------------------------------------------------
   async function submit() {
     setSubmitting(true);
@@ -227,7 +180,12 @@ export function BillingClient({
     } catch (err) {
       setConfirming(false);
       if (err instanceof ApiError) {
-        if (err.status === 401) setAuthed(false);
+        // The route group normally gates auth, but a token can expire mid-shift —
+        // a 401 means the session is gone, so send the cashier back to /login.
+        if (err.status === 401) {
+          router.replace("/login");
+          return;
+        }
         setErrorCode(err.code || "unknown");
       } else {
         setErrorCode("network");
@@ -242,84 +200,16 @@ export function BillingClient({
     <div className="grid gap-4 lg:grid-cols-3">
       {/* ------------------------- left: catalog ------------------------- */}
       <div className="min-w-0 lg:col-span-2">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-[var(--color-ink)] sm:text-2xl">
-              {t("title")}
-            </h1>
-            <p className="text-sm text-[var(--color-muted-foreground)]">
-              {t("subtitle")}
-            </p>
-          </div>
-          {authed ? (
-            <button
-              type="button"
-              onClick={signOut}
-              className="flex min-h-[40px] items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]"
-            >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-              {t("signOut")}
-            </button>
-          ) : null}
+        <div className="mb-4">
+          <h1 className="text-xl font-bold text-[var(--color-ink)] sm:text-2xl">
+            {t("title")}
+          </h1>
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            {t("subtitle")}
+          </p>
         </div>
 
-        {!authed ? (
-          <Card className="mx-auto max-w-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LogIn className="h-5 w-5 text-[var(--color-primary)]" aria-hidden="true" />
-                {t("signInTitle")}
-              </CardTitle>
-            </CardHeader>
-            <p className="mb-4 text-sm text-[var(--color-muted-foreground)]">
-              {t("signInHint")}
-            </p>
-            <form onSubmit={signIn} className="space-y-3">
-              <div>
-                <label htmlFor="billing-email" className="mb-1 block text-xs font-semibold">
-                  {t("email")}
-                </label>
-                <input
-                  id="billing-email"
-                  type="email"
-                  required
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="min-h-[44px] w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 text-base outline-none focus:border-[var(--color-primary)]"
-                />
-              </div>
-              <div>
-                <label htmlFor="billing-password" className="mb-1 block text-xs font-semibold">
-                  {t("password")}
-                </label>
-                <input
-                  id="billing-password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="min-h-[44px] w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 text-base outline-none focus:border-[var(--color-primary)]"
-                />
-              </div>
-              {errorCode ? (
-                <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
-                  {t(`errors.${errorCode}` as never)}
-                </p>
-              ) : null}
-              <button
-                type="submit"
-                disabled={signingIn}
-                className="min-h-[48px] w-full rounded-xl bg-[var(--color-primary)] text-base font-bold text-white transition-colors hover:bg-[var(--color-primary-strong)] disabled:opacity-60"
-              >
-                {signingIn ? t("signingIn") : t("signIn")}
-              </button>
-            </form>
-          </Card>
-        ) : (
-          <>
-            <label className="mb-4 flex min-h-[52px] items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] px-4">
+        <label className="mb-4 flex min-h-[52px] items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] px-4">
               <Search className="h-5 w-5 text-[var(--color-muted-foreground)]" aria-hidden="true" />
               <input
                 type="search"
@@ -359,10 +249,8 @@ export function BillingClient({
                   );
                 })}
               </div>
-            ) : (
-              <EmptyState title={t("emptyCart")} hint={t("emptyCartHint")} />
-            )}
-          </>
+        ) : (
+          <EmptyState title={t("emptyCart")} hint={t("emptyCartHint")} />
         )}
       </div>
 

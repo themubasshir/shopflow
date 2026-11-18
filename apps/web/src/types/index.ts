@@ -211,3 +211,56 @@ export interface InvoiceCreateOut {
   payments: PaymentOut[];
   idempotent_replay: boolean;
 }
+
+// ---- Phase 2B: employees & counter management -------------------------------
+
+export interface RoleOut {
+  id: string;
+  code: string;
+  name_en: string;
+  name_bn: string;
+}
+
+export interface EmployeeOut {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role_code: string;
+  role_name_en: string;
+  role_name_bn: string;
+  is_active: boolean;
+  preferred_locale: "en" | "bn";
+  last_login_at: string | null;
+  assigned_counter_ids: string[];
+  created_at: string;
+}
+
+export interface EmployeeCreate {
+  name: string;
+  email: string;
+  phone?: string | null;
+  role_id: string;
+  password: string;
+  preferred_locale: "en" | "bn";
+  counter_ids: string[];
+}
+
+export interface EmployeeUpdate {
+  name?: string;
+  phone?: string | null;
+  role_id?: string;
+  preferred_locale?: "en" | "bn";
+}
+
+export interface CounterUpdate {
+  is_active?: boolean;
+  name_en?: string;
+  name_bn?: string;
+}
+
+export interface CounterStaffOut {
+  name: string;
+  email: string;
+  is_active: boolean;
+}

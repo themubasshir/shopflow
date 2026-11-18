@@ -46,20 +46,48 @@ billing-client.tsx (client component)
 
 `deps.get_principal` returns a `Principal`:
 
-* **Demo mode** (no `Authorization` header): the seeded manager on the
-  seeded shop — enough for the read APIs.
+* **Demo mode** (no `Authorization` header, `settings.demo_mode` on): the
+  seeded manager on the seeded shop — read APIs only. Flipping `demo_mode`
+  off makes every read require a token.
 * **JWT mode**: `POST /auth/login` verifies argon2 hash and returns an
-  HS256 token carrying `sub`, `shop_id`, `role`, `permissions[]`.
+  HS256 token carrying `sub`, `shop_id`, `role`, `permissions[]`, `jti`.
 
-RBAC lives in `roles.permissions` (string array). `Principal.require()`
-raises 403 for missing permissions.
+### Sessions (Phase 2B)
+
+Each login inserts an `auth_sessions` row keyed by the token's `jti`. JWTs
+are self-contained, so this table is the server-side handle that lets
+**logout** (`POST /auth/logout`) and **account disable** revoke a live token
+immediately instead of trusting it until `exp`. Both `get_principal` and
+`get_authenticated_principal` reject a token whose session is revoked or
+expired (`_session_is_live`), so reads die on sign-out too.
+
+`POST /auth/password` changes the caller's password and revokes every other
+session. `POST /auth/login` is rate-limited by a sliding-window counter
+(`login_rate_limit_*` settings) keyed on email+IP, returning `429`.
+
+### RBAC (Phase 2B)
+
+`app/core/permissions.py` is the single permission matrix for the three
+roles — `owner` (all 13 permissions), `manager` (operations, no admin
+grants), `cashier` (billing + lookup). `Principal.require()` raises 403.
+Admin routers live in `employees.py` (`employees:manage`) and `counters.py`
+(`counters:manage`).
+
+### Counter authorization (Phase 2B)
+
+`user_counters` assigns employees to checkout counters. `Principal.
+assigned_counter_ids` is `None` for owner/manager (unrestricted) and a set
+of allowed counters for cashiers. `assert_counter_allowed` runs inside
+`POST /invoices`, so a client-sent `counter_id` is never trusted — a cashier
+billing an unassigned counter gets 403. `GET /invoices` is likewise scoped
+to assigned counters for restricted roles.
 
 **Write endpoints use `get_authenticated_principal`**, which has no demo
-fallback: `POST /invoices` returns 401 without a real token, so a client can
-never invent a cashier or counter identity. The web app stores the token in an
-httpOnly, same-site cookie (`shopflow_token`) via `POST /api/auth`; server
-components read it with `lib/session.ts`, and the cart's write goes through the
-`/api/billing/invoices` route handler which attaches `Authorization` upstream.
+fallback and re-verifies the user is active and the session is live. The web
+app stores the token in an httpOnly, same-site cookie (`shopflow_token`) via
+`POST /api/auth`; server components read it with `lib/session.ts`, and
+writes go through `app/api/*` route handlers that attach `Authorization`
+upstream.
 
 ## Billing transaction (Phase 2A)
 
