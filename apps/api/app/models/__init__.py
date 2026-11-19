@@ -24,6 +24,7 @@ from app.models.loyalty import (
     LoyaltyRule,
     LoyaltyTransaction,
 )
+from app.models.printing import CounterPrinter, Printer, PrintJob
 from app.models.returns import (
     CustomerRefundSettlement,
     CustomerReturn,
@@ -40,6 +41,7 @@ __all__ = [
     "AuthSession",
     "Category",
     "Counter",
+    "CounterPrinter",
     "Customer",
     "CustomerLedgerEntry",
     "CustomerRefundSettlement",
@@ -57,6 +59,8 @@ __all__ = [
     "MedicineBatch",
     "MedicineDetail",
     "Payment",
+    "PrintJob",
+    "Printer",
     "Product",
     "ProductUnit",
     "Purchase",

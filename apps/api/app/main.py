@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.deps import get_principal  # noqa: F401  (import keeps dependency visible)
 from app.api.v1 import (
+    agent,
     auth,
     catalog,
     counters,
@@ -20,6 +21,7 @@ from app.api.v1 import (
     employees,
     health,
     inventory,
+    printing,
     purchasing,
     receipts,
     reports,
@@ -148,3 +150,5 @@ app.include_router(returns.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.router, prefix=settings.api_v1_prefix)
 app.include_router(employees.router, prefix=settings.api_v1_prefix)
 app.include_router(counters.router, prefix=settings.api_v1_prefix)
+app.include_router(printing.router, prefix=settings.api_v1_prefix)
+app.include_router(agent.router, prefix=settings.api_v1_prefix)

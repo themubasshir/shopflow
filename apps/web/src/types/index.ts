@@ -227,6 +227,86 @@ export interface CounterStaffOut {
   is_active: boolean;
 }
 
+// ---- Phase 2D-2: shared thermal printing ------------------------------------
+
+export type ReceiptLang = "en" | "bn" | "bilingual";
+export type PrintJobStatus =
+  | "pending"
+  | "claimed"
+  | "printing"
+  | "completed"
+  | "failed"
+  | "uncertain"
+  | "cancelled";
+
+export interface PrinterOut {
+  id: string;
+  name: string;
+  transport: "network" | "bluetooth";
+  agent_id: string;
+  paper_width_mm: number;
+  dots_width: number;
+  dpi: number;
+  has_cutter: boolean;
+  is_enabled: boolean;
+  default_language: ReceiptLang;
+  counter_ids: string[];
+}
+
+export interface PrinterCreate {
+  name: string;
+  transport: "network" | "bluetooth";
+  agent_id: string;
+  paper_width_mm?: number;
+  dots_width?: number;
+  dpi?: number;
+  has_cutter?: boolean;
+  is_enabled?: boolean;
+  default_language?: ReceiptLang;
+  config?: { host?: string; port?: number } | null;
+}
+
+export interface PrinterUpdate {
+  name?: string;
+  transport?: "network" | "bluetooth";
+  agent_id?: string;
+  paper_width_mm?: number;
+  dots_width?: number;
+  dpi?: number;
+  has_cutter?: boolean;
+  is_enabled?: boolean;
+  default_language?: ReceiptLang;
+  config?: { host?: string; port?: number } | null;
+}
+
+export interface PrinterRegistered {
+  printer: PrinterOut;
+  agent_token: string;
+}
+
+export interface PrintJobOut {
+  id: string;
+  kind: "invoice" | "test_page";
+  invoice_id: string | null;
+  printer_id: string;
+  counter_id: string | null;
+  language: string;
+  status: PrintJobStatus;
+  attempts: number;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+  reprint_of_job_id: string | null;
+}
+
+export interface PrintJobList {
+  items: PrintJobOut[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export type CustomerCreate = components["schemas"]["CustomerCreate"];
 export type CustomerUpdate = components["schemas"]["CustomerUpdate"];
 export type CustomerLoyaltyOut = components["schemas"]["CustomerLoyaltyOut"];

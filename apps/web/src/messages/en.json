@@ -61,7 +61,7 @@
   },
   "billing": {
     "title": "Billing",
-    "subtitle": "Touch-friendly checkout for three counters",
+    "subtitle": "Touch-friendly checkout for any number of counters",
     "searchProducts": "Search products, scan barcode, or type name…",
     "cart": "Cart",
     "customer": "Customer",
@@ -292,7 +292,9 @@
     "currency": "Currency",
     "timezone": "Timezone",
     "receipt": "Receipt",
-    "users": "Staff"
+    "users": "Staff",
+    "unknown": "—",
+    "activeCounters": "{count, plural, one {# active} other {# active}}"
   },
   "misc": {
     "bdt": "৳",
@@ -765,6 +767,115 @@
       "lot_held": "Held lot units",
       "lot_units_above_physical": "Lot units above physical stock",
       "cost_value": "Inventory cost"
+    }
+  },
+  "printers": {
+    "back": "Back to settings",
+    "title": "Printers",
+    "subtitle": "Register thermal printers and route counters to them",
+    "none": "No printers registered yet",
+    "count": "{count, plural, one {# printer} other {# printers}}",
+    "add": "Add printer",
+    "empty": "No printers yet",
+    "emptyHint": "Register a printer, then run the print agent on a device that can reach it.",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "enable": "Enable printer",
+    "disable": "Disable printer",
+    "agentId": "Agent ID",
+    "paper": "Paper",
+    "cutter": "cutter",
+    "language": "Default language",
+    "languages": {
+      "en": "English",
+      "bn": "Bangla",
+      "bilingual": "English + Bangla"
+    },
+    "counters": "Counters",
+    "noCounters": "Not assigned",
+    "edit": "Edit",
+    "testPage": "Test page",
+    "printing": "Queueing…",
+    "rotate": "Rotate token",
+    "assign": "Counter → printer",
+    "assignHint": "Many counters can share one printer. A counter with no printer falls back to the shop's single enabled printer.",
+    "inactive": "Inactive",
+    "unassigned": "No printer",
+    "editTitle": "Edit printer",
+    "addTitle": "Add printer",
+    "fields": {
+      "name": "Printer name",
+      "transport": "Connection",
+      "agentId": "Agent ID",
+      "paperWidth": "Paper width (mm)",
+      "dotsWidth": "Printable dot width",
+      "dpi": "Resolution (DPI)",
+      "host": "Host / IP",
+      "port": "Port",
+      "language": "Default language",
+      "cutter": "Has cutter",
+      "enabled": "Enabled"
+    },
+    "transport": {
+      "network": "Wi-Fi / LAN",
+      "bluetooth": "Bluetooth (via host)"
+    },
+    "saving": "Saving…",
+    "save": "Save printer",
+    "create": "Register printer",
+    "cancel": "Cancel",
+    "tokenTitle": "Printer agent credentials",
+    "tokenBody": "Give these to the print agent for {name}. The token is shown only once.",
+    "token": "Agent token",
+    "tokenHidden": "Hidden — rotate to issue a new token",
+    "tokenHint": "Run: shopflow-print-agent run --agent-id … --token …",
+    "copy": "Copy",
+    "copied": "Copied",
+    "done": "Done",
+    "errors": {
+      "unauthenticated": "Please sign in again",
+      "forbidden": "You don't have permission to manage printers",
+      "validation_error": "Check the fields and try again",
+      "not_found": "Printer not found",
+      "network": "Can't reach the server — check your connection",
+      "unknown": "Something went wrong — please try again",
+      "printer_required": "Choose a printer",
+      "printer_disabled": "That printer is disabled"
+    },
+    "manage": "Manage printers"
+  },
+  "printJobs": {
+    "title": "Print queue",
+    "refresh": "Refresh",
+    "empty": "No print jobs yet",
+    "emptyHint": "Jobs appear here when a receipt or test page is queued.",
+    "testPage": "Test page",
+    "reprint": "Reprint",
+    "receipt": "Receipt",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "status": {
+      "pending": "Queued",
+      "claimed": "Claimed",
+      "printing": "Printing",
+      "completed": "Printed",
+      "failed": "Failed",
+      "uncertain": "Uncertain",
+      "cancelled": "Cancelled"
+    },
+    "printer": "Printer",
+    "noPrinters": "No printer is registered yet. Add one in Settings → Printers.",
+    "sending": "Queueing…",
+    "sendToPrinter": "Send to printer",
+    "errors": {
+      "unauthenticated": "Please sign in again",
+      "forbidden": "You don't have permission to print",
+      "validation_error": "Check the details and try again",
+      "not_found": "Print job not found",
+      "conflict": "That action isn't possible right now",
+      "network": "Can't reach the server — check your connection",
+      "unknown": "Something went wrong — please try again",
+      "uncertain_requires_reprint": "The outcome is uncertain — reprint explicitly"
     }
   }
 }

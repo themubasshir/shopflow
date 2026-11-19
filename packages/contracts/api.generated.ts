@@ -1012,10 +1012,352 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/printing/printers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Printers */
+        get: operations["list_printers_api_v1_printing_printers_get"];
+        put?: never;
+        /** Create Printer */
+        post: operations["create_printer_api_v1_printing_printers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/printing/printers/{printer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Printer */
+        patch: operations["update_printer_api_v1_printing_printers__printer_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/printing/printers/{printer_id}/rotate-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate Token */
+        post: operations["rotate_token_api_v1_printing_printers__printer_id__rotate_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/printing/counters/{counter_id}/printer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign Counter Printer */
+        put: operations["assign_counter_printer_api_v1_printing_counters__counter_id__printer_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/printing/printers/{printer_id}/test-page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Page
+         * @description Queue a calibration/test page on one printer (owner only).
+         *
+         *     The page proves transport, cut, alignment and Bangla shaping on real
+         *     hardware without touching any invoice.
+         */
+        post: operations["test_page_api_v1_printing_printers__printer_id__test_page_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/printing/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Jobs */
+        get: operations["list_jobs_api_v1_printing_jobs_get"];
+        put?: never;
+        /** Enqueue */
+        post: operations["enqueue_api_v1_printing_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/printing/jobs/{job_id}/reprint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reprint
+         * @description Explicit reprint: always a *new* job for the same document, linked to the
+         *     prior one. Never mutates or reopens a completed invoice.
+         */
+        post: operations["reprint_api_v1_printing_jobs__job_id__reprint_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/printing/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job */
+        get: operations["get_job_api_v1_printing_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/printing/jobs/{job_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry */
+        post: operations["retry_api_v1_printing_jobs__job_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/printing/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_api_v1_printing_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print/agent/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Agent Config
+         * @description Transport connection detail bound to this agent's printer only — an
+         *     agent can never read another printer's host/port.
+         */
+        post: operations["agent_config_api_v1_print_agent_config_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print/agent/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim
+         * @description Lease the oldest pending job for this agent's printer (FIFO).
+         *
+         *     Returns ``job=None`` when the queue is empty. The ``claim_token`` binds the
+         *     subsequent report to this lease; ``document_token`` authorizes one document
+         *     fetch for this job.
+         */
+        post: operations["claim_api_v1_print_agent_claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print/agent/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Document
+         * @description Exchange a job's one-time document token for a short-lived render grant.
+         *
+         *     The agent proves its printer credential AND the per-job document secret. In
+         *     return it receives a single-purpose ``render_url`` pointing at the web
+         *     layer's canonical receipt-PDF route — the only document it may fetch. The
+         *     grant authorizes exactly one invoice+language and cannot be widened.
+         */
+        post: operations["document_api_v1_print_agent_document_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print/grants/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Grant
+         * @description Introspect a render grant. Called server-to-server by the web layer to
+         *     confirm the grant's signature and recover the scoped invoice+language. Not
+         *     an agent endpoint — it carries no printer credential and mutates nothing.
+         */
+        post: operations["verify_grant_api_v1_print_grants_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print/grants/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grant Receipt
+         * @description Return the receipt the render grant names. The web layer calls this
+         *     after verifying the grant so it can render the canonical PDF. The grant
+         *     scopes both invoice and caller; an invoice id outside the grant is refused,
+         *     as is a test-page grant (which has no invoice to render).
+         */
+        post: operations["grant_receipt_api_v1_print_grants_receipt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print/agent/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report
+         * @description Report physical progress for a claimed job. The ``claim_token`` proves
+         *     the reporter holds the current lease; only that lease may transition the
+         *     job.
+         */
+        post: operations["report_api_v1_print_agent_report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgentConfig */
+        AgentConfig: {
+            /**
+             * Printer Id
+             * Format: uuid
+             */
+            printer_id: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Transport */
+            transport: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** AgentCredentials */
+        AgentCredentials: {
+            /** Agent Id */
+            agent_id: string;
+            /** Token */
+            token: string;
+        };
         /** BatchOut */
         BatchOut: {
             /**
@@ -1097,6 +1439,44 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** ClaimResponse */
+        ClaimResponse: {
+            job?: components["schemas"]["ClaimedJob"] | null;
+        };
+        /**
+         * ClaimedJob
+         * @description What an agent needs to render one job. The document is fetched once via
+         *     ``document_token``; the calibration snapshot is authoritative for raster.
+         */
+        ClaimedJob: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Invoice Id */
+            invoice_id: string | null;
+            /** Invoice Number */
+            invoice_number: string | null;
+            /** Language */
+            language: string;
+            /** Claim Token */
+            claim_token: string;
+            /** Document Token */
+            document_token: string;
+            /** Lease Seconds */
+            lease_seconds: number;
+            /** Dots Width */
+            dots_width: number;
+            /** Dpi */
+            dpi: number;
+            /** Paper Width Mm */
+            paper_width_mm: number;
+            /** Has Cutter */
+            has_cutter: boolean;
+        };
         /** CounterActivity */
         CounterActivity: {
             /**
@@ -1139,6 +1519,11 @@ export interface components {
             name_bn: string;
             /** Is Active */
             is_active: boolean;
+        };
+        /** CounterPrinterAssign */
+        CounterPrinterAssign: {
+            /** Printer Id */
+            printer_id?: string | null;
         };
         /** CounterUpdate */
         CounterUpdate: {
@@ -1443,6 +1828,36 @@ export interface components {
             expected: string;
             /** Actual */
             actual: string;
+        };
+        /** DocumentRequest */
+        DocumentRequest: {
+            /** Agent Id */
+            agent_id: string;
+            /** Token */
+            token: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Document Token */
+            document_token: string;
+        };
+        /**
+         * DocumentResponse
+         * @description A short-lived, single-purpose render grant. The agent presents
+         *     ``render_url`` to the web layer's canonical receipt-PDF route; the grant
+         *     authorizes exactly one invoice+language render and cannot be widened.
+         */
+        DocumentResponse: {
+            /** Render Url */
+            render_url: string;
+            /** Kind */
+            kind: string;
+            /** Invoice Id */
+            invoice_id: string | null;
+            /** Language */
+            language: string;
         };
         /** DuePaymentCreate */
         DuePaymentCreate: {
@@ -1880,6 +2295,29 @@ export interface components {
             /** History */
             history: components["schemas"]["ReturnOut"][];
         };
+        /** JobReport */
+        JobReport: {
+            /** Agent Id */
+            agent_id: string;
+            /** Token */
+            token: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Claim Token */
+            claim_token: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "printing" | "completed" | "failed";
+            /** Error Code */
+            error_code?: string | null;
+            /** Error Message */
+            error_message?: string | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -2171,6 +2609,192 @@ export interface components {
              * Format: date-time
              */
             paid_at: string;
+        };
+        /** PrintJobCreate */
+        PrintJobCreate: {
+            /**
+             * Invoice Id
+             * Format: uuid
+             */
+            invoice_id: string;
+            /** Printer Id */
+            printer_id?: string | null;
+            /** Language */
+            language?: ("en" | "bn" | "bilingual") | null;
+        };
+        /** PrintJobList */
+        PrintJobList: {
+            /** Items */
+            items: components["schemas"]["PrintJobOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** PrintJobOut */
+        PrintJobOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Invoice Id */
+            invoice_id: string | null;
+            /**
+             * Printer Id
+             * Format: uuid
+             */
+            printer_id: string;
+            /** Counter Id */
+            counter_id: string | null;
+            /** Language */
+            language: string;
+            /** Status */
+            status: string;
+            /** Attempts */
+            attempts: number;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Reprint Of Job Id */
+            reprint_of_job_id: string | null;
+        };
+        /** PrinterCreate */
+        PrinterCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Transport
+             * @default network
+             * @enum {string}
+             */
+            transport: "network" | "bluetooth";
+            /** Agent Id */
+            agent_id: string;
+            /**
+             * Paper Width Mm
+             * @default 80
+             */
+            paper_width_mm: number;
+            /**
+             * Dots Width
+             * @default 576
+             */
+            dots_width: number;
+            /**
+             * Dpi
+             * @default 203
+             */
+            dpi: number;
+            /**
+             * Has Cutter
+             * @default true
+             */
+            has_cutter: boolean;
+            /**
+             * Is Enabled
+             * @default true
+             */
+            is_enabled: boolean;
+            /**
+             * Default Language
+             * @default bilingual
+             * @enum {string}
+             */
+            default_language: "en" | "bn" | "bilingual";
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** PrinterOut */
+        PrinterOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Transport */
+            transport: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Paper Width Mm */
+            paper_width_mm: number;
+            /** Dots Width */
+            dots_width: number;
+            /** Dpi */
+            dpi: number;
+            /** Has Cutter */
+            has_cutter: boolean;
+            /** Is Enabled */
+            is_enabled: boolean;
+            /** Default Language */
+            default_language: string;
+            /**
+             * Counter Ids
+             * @default []
+             */
+            counter_ids: string[];
+        };
+        /**
+         * PrinterRegistered
+         * @description Returned exactly once on create/rotate: the only place the raw agent
+         *     token is ever revealed. Store it in the agent's config.
+         */
+        PrinterRegistered: {
+            printer: components["schemas"]["PrinterOut"];
+            /** Agent Token */
+            agent_token: string;
+        };
+        /** PrinterTestPage */
+        PrinterTestPage: {
+            /** Language */
+            language?: ("en" | "bn" | "bilingual") | null;
+        };
+        /** PrinterTokenRotated */
+        PrinterTokenRotated: {
+            printer: components["schemas"]["PrinterOut"];
+            /** Agent Token */
+            agent_token: string;
+        };
+        /** PrinterUpdate */
+        PrinterUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Transport */
+            transport?: ("network" | "bluetooth") | null;
+            /** Agent Id */
+            agent_id?: string | null;
+            /** Paper Width Mm */
+            paper_width_mm?: number | null;
+            /** Dots Width */
+            dots_width?: number | null;
+            /** Dpi */
+            dpi?: number | null;
+            /** Has Cutter */
+            has_cutter?: boolean | null;
+            /** Is Enabled */
+            is_enabled?: boolean | null;
+            /** Default Language */
+            default_language?: ("en" | "bn" | "bilingual") | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ProductOut */
         ProductOut: {
@@ -2537,6 +3161,11 @@ export interface components {
         RefundComplete: {
             /** Reference */
             reference: string;
+        };
+        /** ReportResponse */
+        ReportResponse: {
+            /** Status */
+            status: string;
         };
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
@@ -2971,6 +3600,18 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** _GrantReceipt */
+        _GrantReceipt: {
+            /** Grant */
+            grant: string;
+            /** Invoice Id */
+            invoice_id: string;
+        };
+        /** _GrantVerify */
+        _GrantVerify: {
+            /** Grant */
+            grant: string;
         };
     };
     responses: never;
@@ -5136,6 +5777,584 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_printers_api_v1_printing_printers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterOut"][];
+                };
+            };
+        };
+    };
+    create_printer_api_v1_printing_printers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrinterCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterRegistered"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_printer_api_v1_printing_printers__printer_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrinterUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_token_api_v1_printing_printers__printer_id__rotate_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterTokenRotated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_counter_printer_api_v1_printing_counters__counter_id__printer_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                counter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CounterPrinterAssign"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_page_api_v1_printing_printers__printer_id__test_page_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PrinterTestPage"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_jobs_api_v1_printing_jobs_get: {
+        parameters: {
+            query?: {
+                invoice_id?: string | null;
+                status_filter?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintJobList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_api_v1_printing_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrintJobCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reprint_api_v1_printing_jobs__job_id__reprint_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_v1_printing_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_api_v1_printing_jobs__job_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_api_v1_printing_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_config_api_v1_print_agent_config_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentCredentials"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_api_v1_print_agent_claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentCredentials"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    document_api_v1_print_agent_document_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_grant_api_v1_print_grants_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["_GrantVerify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_receipt_api_v1_print_grants_receipt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["_GrantReceipt"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_api_v1_print_agent_report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobReport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
                 };
             };
             /** @description Validation Error */

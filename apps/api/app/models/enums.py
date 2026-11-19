@@ -65,3 +65,39 @@ class UnitOfMeasure(str, enum.Enum):
     BOX = "box"
     BOTTLE = "bottle"
     SACHET = "sachet"
+
+
+# --- Phase 2D-2: shared thermal printing -------------------------------------
+
+
+class PrinterTransport(str, enum.Enum):
+    """How the agent reaches the printer hardware.
+
+    ``NETWORK`` is the only transport supported today (Wi-Fi/LAN TCP 9100).
+    ``BLUETOOTH`` is declared so a dedicated host can be added later without
+    changing the queue or renderer — it is not a working path yet.
+    """
+
+    NETWORK = "network"
+    BLUETOOTH = "bluetooth"
+
+
+class PrintJobStatus(str, enum.Enum):
+    """Lifecycle of a queued print job.
+
+    ``pending``      — waiting for an agent to claim it
+    ``claimed``      — leased to an agent, rendering/streaming in progress
+    ``printing``     — agent signalled it has started streaming to the device
+    ``completed``    — agent confirmed the physical print finished
+    ``failed``       — agent reported a recoverable error; may be retried
+    ``uncertain``    — lease expired or outcome unknown; NEVER auto-reprinted
+    ``cancelled``    — owner cancelled before an agent picked it up
+    """
+
+    PENDING = "pending"
+    CLAIMED = "claimed"
+    PRINTING = "printing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    UNCERTAIN = "uncertain"
+    CANCELLED = "cancelled"

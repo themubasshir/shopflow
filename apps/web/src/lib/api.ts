@@ -67,6 +67,29 @@ export const api = {
   invoiceReceipt: (id: string) => request<import("@/types").InvoiceReceipt>(`/invoices/${encodeURIComponent(id)}/receipt`),
   receiptSettings: () => request<import("@/types").ReceiptSettings>("/settings/receipts"),
 
+  // ---- Phase 2D-2: print agent render grants --------------------------------
+  // Server-to-server: the web layer exchanges a verified render grant for the
+  // receipt the grant scopes, so an agent's printed PDF is the canonical doc.
+  receiptForGrant: (grant: string, invoiceId: string) =>
+    request<import("@/types").InvoiceReceipt>("/print/grants/receipt", {
+      method: "POST",
+      body: JSON.stringify({ grant, invoice_id: invoiceId }),
+    }),
+
+  // ---- Phase 2D-2: shared thermal printing (server components only) ---------
+  printers: () => request<import("@/types").PrinterOut[]>("/printing/printers"),
+  printJobs: (params?: { invoice_id?: string; status?: string; limit?: number; offset?: number }) => {
+    const qs = params
+      ? "?" +
+        new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v != null)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : "";
+    return request<import("@/types").PrintJobList>(`/printing/jobs${qs}`);
+  },
+
   // ---- Phase 2B: session / employees / counter management ------------------
   me: () => request<import("@/lib/session").Me>("/auth/me"),
   employees: () => request<import("@/types").EmployeeOut[]>("/employees"),

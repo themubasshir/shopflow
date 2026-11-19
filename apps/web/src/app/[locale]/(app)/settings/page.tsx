@@ -1,8 +1,10 @@
 import { getTranslations } from "next-intl/server";
-import { Store, MonitorSmartphone, Globe, Printer, Users } from "lucide-react";
+import { Store, MonitorSmartphone, Globe, Printer } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { Link } from "@/i18n/navigation";
+import { secondaryButton } from "@/components/ui/pos-form";
 import { verifySession, hasPermission } from "@/lib/session";
 import { ReceiptSettingsEditor } from "./receipt-settings";
 import { api } from "@/lib/api";
@@ -16,16 +18,36 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const tApp = await getTranslations({ locale, namespace: "app" });
 
   const tReceipt = await getTranslations({ locale, namespace: "receipts" });
-  const [dashboard, session] = await Promise.all([api.dashboard().catch(() => null), verifySession()]);
+  const tPrinter = await getTranslations({ locale, namespace: "printers" });
+  const [dashboard, session, printers] = await Promise.all([
+    api.dashboard().catch(() => null),
+    verifySession(),
+    api.printers().catch(() => null),
+  ]);
   const canEditReceipt = session?.me.role === "owner" && hasPermission(session.me, "settings:write");
   const receipt = canEditReceipt ? await api.receiptSettings().catch(() => null) : null;
 
   const rows = [
     { icon: Store, label: t("shop"), value: `${tApp("name")} · ${tApp("tagline")}` },
-    { icon: MonitorSmartphone, label: t("counters"), value: dashboard ? `${dashboard.summary.active_counters} active` : "3" },
+    {
+      icon: MonitorSmartphone,
+      label: t("counters"),
+      value: dashboard
+        ? t("activeCounters", { count: dashboard.summary.active_counters })
+        : t("unknown"),
+    },
     { icon: Globe, label: t("timezone"), value: "Asia/Dhaka (UTC+6)" },
     { icon: Printer, label: t("receipt"), value: "80mm thermal · BDT ৳" },
-    { icon: Users, label: t("users"), value: "Manager · 2 cashiers" },
+    {
+      icon: Printer,
+      label: tPrinter("title"),
+      value:
+        printers === null
+          ? t("unknown")
+          : printers.length === 0
+            ? tPrinter("none")
+            : tPrinter("count", { count: printers.length }),
+    },
   ];
 
   return (
@@ -51,6 +73,14 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
             </li>
           ))}
         </ul>
+        {canEditReceipt ? (
+          <div className="mt-3 border-t border-[var(--color-border)] pt-3">
+            <Link href="/settings/printers" className={secondaryButton}>
+              <Printer size={17} aria-hidden="true" />
+              {tPrinter("manage")}
+            </Link>
+          </div>
+        ) : null}
       </Card>
 
       <Card className="bg-[var(--color-primary-050)]">
