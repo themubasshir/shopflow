@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "gen:types": "openapi-typescript http://localhost:8001/openapi.json -o ../../packages/contracts/api.generated.ts"
   },
   "dependencies": {

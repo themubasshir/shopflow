@@ -128,10 +128,34 @@ scoped / manager full history / change-password revokes other sessions.
 Screenshots: `docs/screenshots/p2b-*.png` (login EN/BN, owner dashboard +
 employees + counters, cashier-scoped dashboard, mobile login).
 
-## Known limitations
+## Phase 2B limitations at release
 
 * Demo-only data (`is_demo` flag + badge).
 * Loyalty is earn-only in Phase 2A; redemption lands in the next phase.
 * Payments are recorded manually (cash/bKash/Nagad); no gateway integration.
 * Port 8001 used because 8000 was occupied by another local process.
 * `alembic` post-write hook (`ruff format`) emits a harmless entry-point warning on Windows.
+
+## Phase 2C — customer accounts, loyalty and dues
+
+| Check | Result |
+|---|---|
+| Alembic on `shopflow_test` | `c493c5806cb7` is head |
+| Full pytest suite against PostgreSQL `shopflow_test` | 112 passed |
+| Ruff lint and changed Python file formatting | Passed |
+| `npm run typecheck`, `npm run lint`, `npm run build` | Passed |
+| Playwright Chromium against the production build | Four workflows passed |
+| Direct PostgreSQL reconciliation | Four browser accounts and invoices reconciled |
+
+The API suite includes customer normalization and duplicates, tenant and permission checks, the 299/300-point boundary, step validation, product and category eligibility, distinct-counter redemption races, identical retries, rollback after database writes, full and partial payments, due-only invoices, concurrent collections, overpayment, credit-limit races, immutable ledger rows and existing billing and access regressions.
+
+Chromium verified English and Bangla at 375 px and 1440 px. In each scenario it created and edited a customer, searched by mobile number, earned 300 points on a fully paid bill, redeemed 100 points on a second bill, took a ৳50 partial payment, collected the remaining ৳300 via Nagad, viewed the transaction histories and deactivated the account. Cross-origin and missing-Origin API writes were rejected. The pages had no horizontal overflow, and Chromium reported no duplicate React keys or hydration errors.
+
+Independent database queries confirmed signed loyalty entries of `+300, -100, +3` and a final balance of 203 points. They also confirmed receivable entries of `+৳300, -৳300`, a settled ৳350 invoice and zero outstanding dues for each browser customer.
+
+- [English desktop customer profile](screenshots/p2c-en-desktop-customer.png)
+- [English mobile checkout receipt](screenshots/p2c-en-mobile-billing.png)
+- [Bangla desktop points history](screenshots/p2c-bn-desktop-loyalty.png)
+- [Bangla mobile account statement](screenshots/p2c-bn-mobile-statement.png)
+
+See [Phase 2C](PHASE-2C.md) for limitations and business rules.

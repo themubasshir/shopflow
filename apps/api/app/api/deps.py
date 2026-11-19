@@ -43,6 +43,11 @@ class Principal:
                 detail=f"Missing permission: {permission}",
             )
 
+    def require_write(self, permission: str) -> None:
+        if self.is_demo:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        self.require(permission)
+
     @property
     def can_manage_counters(self) -> bool:
         """True when the principal may bill at any counter (not restricted to
@@ -95,7 +100,7 @@ def get_principal(
         raise HTTPException(status_code=503, detail="No shop configured yet")
 
     if credentials is None:
-        if not settings.demo_mode:
+        if not settings.demo_mode or not shop.is_demo:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required",
@@ -119,27 +124,12 @@ def get_principal(
             email=user.email,
             name=user.name,
             role_code=role.code,
-            permissions=frozenset(role.permissions or []),
+            permissions=frozenset(p for p in (role.permissions or []) if p.endswith(":read")),
             assigned_counter_ids=_assigned_counters(db, user.id, role.code),
             is_demo=True,
         )
 
-    payload = _decode(credentials)
-    user_id = uuid.UUID(payload["sub"])
-    # A presented token must correspond to a live (unrevoked, unexpired)
-    # session — logging out or being disabled kills reads as well as writes.
-    if not _session_is_live(db, payload.get("jti"), user_id):
-        raise HTTPException(status_code=401, detail="Session expired or signed out")
-    return Principal(
-        user_id=user_id,
-        shop_id=uuid.UUID(payload["shop_id"]),
-        email=payload.get("email", ""),
-        name=payload.get("name", ""),
-        role_code=payload.get("role", "cashier"),
-        permissions=frozenset(payload.get("permissions") or []),
-        assigned_counter_ids=_assigned_counters(db, user_id, payload.get("role", "cashier")),
-        session_id=uuid.UUID(payload["jti"]) if payload.get("jti") else None,
-    )
+    return get_authenticated_principal(_decode(credentials), db)
 
 
 def _decode(credentials: HTTPAuthorizationCredentials) -> dict:

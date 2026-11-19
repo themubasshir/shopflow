@@ -100,7 +100,7 @@ def list_products(
             price=price_map.get(p.id),
             category_name_en=c.name_en,
             category_name_bn=c.name_bn,
-            loyalty_eligible=c.loyalty_eligible,
+            loyalty_eligible=p.loyalty_eligible and c.loyalty_eligible,
         )
         for p, c in rows
     ]

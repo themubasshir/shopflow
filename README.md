@@ -2,7 +2,7 @@
 
 Bilingual (English/Bangla) grocery & pharmacy management for a shop in
 Bangladesh with three billing counters. Phase 1: project foundation,
-database, loyalty rule engine, and the working dashboard.
+database, loyalty rule engine, and the working dashboard. Phase 2C adds customer accounts, loyalty redemption, and বাকি খাতা (customer dues).
 
 ## Stack
 
@@ -76,26 +76,27 @@ Automated tests run against a dedicated **`shopflow_test`** database — never
 ```powershell
 cd apps\api
 $env:PYTHONPATH='.'
-$env:DATABASE_URL='postgresql+psycopg://shopflow_app:<pw>@localhost:5432/shopflow_test'
+$env:SHOPFLOW_TEST_DATABASE_URL='postgresql+psycopg://shopflow_app:<pw>@localhost:5432/shopflow_test'
+$env:DATABASE_URL=$env:SHOPFLOW_TEST_DATABASE_URL
 .\.venv\Scripts\python.exe -m alembic upgrade head
 .\.venv\Scripts\python.exe database\seeds\seed.py
 ```
 
 `tests/conftest.py` swaps `SessionLocal` and the `get_db` dependency to the
 test DB and aborts if the URL targets anything else. `scripts/reset_test_db.py`
-resets it safely (refuses non-test targets).
+requires an explicit test URL and resets only a PostgreSQL database named `shopflow_test`.
 
 ## Quality gates that pass
 
 - `npm run typecheck`, `npm run lint`, `npm run build`
 - `ruff check` + `ruff format` on `app`, `tests`, `database/seeds`
-- `pytest` — 75 tests (loyalty rules, auth/JWT, API shape, RBAC & counter authz)
-- Alembic `upgrade head` on `shopflow_dev`
-- Playwright screenshots at 375/768/1024/1440 in `docs/screenshots/`
+- `pytest` — 112 tests against PostgreSQL `shopflow_test`
+- Alembic `c493c5806cb7` applied and verified on `shopflow_test`
+- Playwright verified Phase 2C in English and Bangla at 375 and 1440 px. See [test results](docs/TESTING.md#phase-2c--customer-accounts-loyalty-and-dues).
 
 ## Demo vs real data
 
-Phase 2B adds real auth + RBAC + counter management on top of the demo seed.
-Reads without a token still fall back to a demo manager only while
-`settings.demo_mode` is on; writes always require a live session. Catalogue
-data remains labelled demo (`is_demo` flag + "Demo data" badge).
+Demo fallback is off by default. Development and test can opt in with
+`DEMO_MODE=true` for read-only access to a seeded demo shop. Customer accounts and
+financial operations require a live session. Production web writes require
+`SHOPFLOW_WEB_ORIGIN`. See [Phase 2C](docs/PHASE-2C.md).

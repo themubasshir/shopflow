@@ -167,23 +167,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/customers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Customers */
-        get: operations["list_customers_api_v1_customers_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/loyalty/accounts": {
         parameters: {
             query?: never;
@@ -218,6 +201,161 @@ export interface paths {
          *     identity comes from the JWT; counter must belong to the caller's shop.
          */
         post: operations["create_invoice_api_v1_invoices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Customers */
+        get: operations["list_customers_api_v1_customers_get"];
+        put?: never;
+        /** Add Customer */
+        post: operations["add_customer_api_v1_customers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Detail */
+        get: operations["customer_detail_api_v1_customers__customer_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit Customer */
+        patch: operations["edit_customer_api_v1_customers__customer_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Balance */
+        get: operations["customer_balance_api_v1_customers__customer_id__balance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Invoices */
+        get: operations["customer_invoices_api_v1_customers__customer_id__invoices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Payments */
+        get: operations["customer_payments_api_v1_customers__customer_id__payments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Statement */
+        get: operations["customer_statement_api_v1_customers__customer_id__statement_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/invoices/{invoice_id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Collect Payment */
+        post: operations["collect_payment_api_v1_customers__customer_id__invoices__invoice_id__payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/loyalty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Loyalty */
+        get: operations["customer_loyalty_api_v1_customers__customer_id__loyalty_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/loyalty/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Loyalty Transactions */
+        get: operations["customer_loyalty_transactions_api_v1_customers__customer_id__loyalty_transactions_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -495,6 +633,72 @@ export interface components {
             /** Name Bn */
             name_bn?: string | null;
         };
+        /** CustomerBalanceOut */
+        CustomerBalanceOut: {
+            /** Outstanding Due */
+            outstanding_due: string;
+        };
+        /** CustomerCreate */
+        CustomerCreate: {
+            /** Name */
+            name: string;
+            /** Name Bn */
+            name_bn?: string | null;
+            /** Phone */
+            phone: string;
+            /** Email */
+            email?: string | null;
+            /**
+             * Credit Limit
+             * @default 0
+             */
+            credit_limit: number | string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** CustomerLedgerEntryOut */
+        CustomerLedgerEntryOut: {
+            /** Id */
+            id: number;
+            /**
+             * Invoice Id
+             * Format: uuid
+             */
+            invoice_id: string;
+            /** Invoice Number */
+            invoice_number: string;
+            /** Payment Id */
+            payment_id: string | null;
+            /** Amount */
+            amount: string;
+            /** Balance After */
+            balance_after: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CustomerLoyaltyOut */
+        CustomerLoyaltyOut: {
+            /** Points Balance */
+            points_balance: number;
+            /** Lifetime Earned */
+            lifetime_earned: number;
+            /** Lifetime Redeemed */
+            lifetime_redeemed: number;
+            /** Can Redeem */
+            can_redeem: boolean;
+            /** Min Redeem Balance */
+            min_redeem_balance: number;
+            /** Redeem Step Points */
+            redeem_step_points: number;
+            /** Point Value Bdt */
+            point_value_bdt: string;
+        };
         /** CustomerOut */
         CustomerOut: {
             /**
@@ -504,6 +708,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Name Bn */
+            name_bn?: string | null;
             /** Phone */
             phone: string | null;
             /** Email */
@@ -517,6 +723,47 @@ export interface components {
             points_balance: number;
             /** Is Active */
             is_active: boolean;
+        };
+        /** CustomerPaymentOut */
+        CustomerPaymentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Method */
+            method: string;
+            /** Amount */
+            amount: string;
+            /** Reference */
+            reference: string | null;
+            /**
+             * Paid At
+             * Format: date-time
+             */
+            paid_at: string;
+            /**
+             * Invoice Id
+             * Format: uuid
+             */
+            invoice_id: string;
+            /** Invoice Number */
+            invoice_number: string;
+        };
+        /** CustomerUpdate */
+        CustomerUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Name Bn */
+            name_bn?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Credit Limit */
+            credit_limit?: number | string | null;
+            /** Is Active */
+            is_active?: boolean | null;
         };
         /** DashboardResponse */
         DashboardResponse: {
@@ -553,6 +800,40 @@ export interface components {
              * Format: date-time
              */
             generated_at: string;
+        };
+        /** DuePaymentCreate */
+        DuePaymentCreate: {
+            /** Amount */
+            amount: number | string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "cash" | "bkash" | "nagad";
+            /** Reference */
+            reference?: string | null;
+        };
+        /** DuePaymentOut */
+        DuePaymentOut: {
+            payment: components["schemas"]["CustomerPaymentOut"];
+            /** Outstanding Due */
+            outstanding_due: string;
+            /** Paid Total */
+            paid_total: string;
+            /** Due Total */
+            due_total: string;
+            /**
+             * Payment Status
+             * @enum {string}
+             */
+            payment_status: "paid" | "partially_paid" | "due";
+            /** Loyalty Points Earned */
+            loyalty_points_earned: number;
+            /**
+             * Idempotent Replay
+             * @default false
+             */
+            idempotent_replay: boolean;
         };
         /** EmployeeCreate */
         EmployeeCreate: {
@@ -688,9 +969,23 @@ export interface components {
             discount_total: number | string;
             /** Payments */
             payments: components["schemas"]["PaymentCreate"][];
+            /**
+             * Allow Due
+             * @description Set to true to allow an unpaid amount for a registered customer.
+             */
+            allow_due?: boolean;
+            /**
+             * Redeem Points
+             * @description Points to redeem in this sale. Omit for no redemption.
+             */
+            redeem_points?: number;
         };
         /** InvoiceCreateOut */
         InvoiceCreateOut: {
+            /** Paid Total */
+            paid_total: string;
+            /** Due Total */
+            due_total: string;
             /**
              * Id
              * Format: uuid
@@ -712,10 +1007,16 @@ export interface components {
             tax_total: string;
             /** Total */
             total: string;
-            /** Paid Total */
-            paid_total: string;
-            /** Due Total */
-            due_total: string;
+            /**
+             * Loyalty Discount
+             * @default 0.00
+             */
+            loyalty_discount: string;
+            /**
+             * Loyalty Points Redeemed
+             * @default 0
+             */
+            loyalty_points_redeemed: number;
             /** Loyalty Points Earned */
             loyalty_points_earned: number;
             /** Loyalty Points Balance */
@@ -731,6 +1032,11 @@ export interface components {
              * @default false
              */
             idempotent_replay: boolean;
+            /**
+             * Payment Status
+             * @enum {string}
+             */
+            readonly payment_status: "paid" | "partially_paid" | "due";
         };
         /**
          * InvoiceItemCreate
@@ -778,6 +1084,10 @@ export interface components {
         };
         /** InvoiceOut */
         InvoiceOut: {
+            /** Paid Total */
+            paid_total: string;
+            /** Due Total */
+            due_total: string;
             /**
              * Id
              * Format: uuid
@@ -801,10 +1111,6 @@ export interface components {
             tax_total: string;
             /** Total */
             total: string;
-            /** Paid Total */
-            paid_total: string;
-            /** Due Total */
-            due_total: string;
             /** Finalized At */
             finalized_at: string | null;
             /**
@@ -822,6 +1128,11 @@ export interface components {
              * @default []
              */
             payment_methods: string[];
+            /**
+             * Payment Status
+             * @enum {string}
+             */
+            readonly payment_status: "paid" | "partially_paid" | "due";
         };
         /** LoginRequest */
         LoginRequest: {
@@ -862,6 +1173,8 @@ export interface components {
             customer_id: string;
             /** Customer Name */
             customer_name: string;
+            /** Customer Name Bn */
+            customer_name_bn?: string | null;
             /** Phone */
             phone: string | null;
             /** Points Balance */
@@ -872,6 +1185,29 @@ export interface components {
             lifetime_redeemed: number;
             /** Can Redeem */
             can_redeem: boolean;
+        };
+        /** LoyaltyEntryOut */
+        LoyaltyEntryOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Invoice Id */
+            invoice_id: string | null;
+            /** Invoice Number */
+            invoice_number: string | null;
+            /** Transaction Type */
+            transaction_type: string;
+            /** Points */
+            points: number;
+            /** Balance After */
+            balance_after: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** MeOut */
         MeOut: {
@@ -898,10 +1234,32 @@ export interface components {
              */
             is_demo: boolean;
         };
+        /** Paginated[CustomerLedgerEntryOut] */
+        Paginated_CustomerLedgerEntryOut_: {
+            /** Items */
+            items: components["schemas"]["CustomerLedgerEntryOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Paginated[CustomerOut] */
         Paginated_CustomerOut_: {
             /** Items */
             items: components["schemas"]["CustomerOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Paginated[CustomerPaymentOut] */
+        Paginated_CustomerPaymentOut_: {
+            /** Items */
+            items: components["schemas"]["CustomerPaymentOut"][];
             /** Total */
             total: number;
             /** Limit */
@@ -924,6 +1282,17 @@ export interface components {
         Paginated_LoyaltyAccountOut_: {
             /** Items */
             items: components["schemas"]["LoyaltyAccountOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Paginated[LoyaltyEntryOut] */
+        Paginated_LoyaltyEntryOut_: {
+            /** Items */
+            items: components["schemas"]["LoyaltyEntryOut"][];
             /** Total */
             total: number;
             /** Limit */
@@ -1315,39 +1684,6 @@ export interface operations {
             };
         };
     };
-    list_customers_api_v1_customers_get: {
-        parameters: {
-            query?: {
-                q?: string | null;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Paginated_CustomerOut_"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_loyalty_accounts_api_v1_loyalty_accounts_get: {
         parameters: {
             query?: {
@@ -1427,6 +1763,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Idempotent replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceCreateOut"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
@@ -1434,6 +1779,384 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvoiceCreateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_customers_api_v1_customers_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                active?: boolean | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paginated_CustomerOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_customer_api_v1_customers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_detail_api_v1_customers__customer_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_customer_api_v1_customers__customer_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_balance_api_v1_customers__customer_id__balance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerBalanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_invoices_api_v1_customers__customer_id__invoices_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paginated_InvoiceOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_payments_api_v1_customers__customer_id__payments_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paginated_CustomerPaymentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_statement_api_v1_customers__customer_id__statement_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paginated_CustomerLedgerEntryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    collect_payment_api_v1_customers__customer_id__invoices__invoice_id__payments_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                customer_id: string;
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DuePaymentCreate"];
+            };
+        };
+        responses: {
+            /** @description Idempotent replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuePaymentOut"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuePaymentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_loyalty_api_v1_customers__customer_id__loyalty_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLoyaltyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_loyalty_transactions_api_v1_customers__customer_id__loyalty_transactions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                customer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paginated_LoyaltyEntryOut_"];
                 };
             };
             /** @description Validation Error */

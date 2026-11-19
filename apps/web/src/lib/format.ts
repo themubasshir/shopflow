@@ -23,7 +23,7 @@ export function formatNumber(value: string | number | null | undefined): string 
 
 export function formatDate(iso: string | null | undefined, locale = "en"): string {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat(locale === "bn" ? "bn-BD" : "en-GB", {
+  return new Intl.DateTimeFormat(locale === "bn" ? "bn-BD-u-nu-latn" : "en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",

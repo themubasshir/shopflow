@@ -52,9 +52,17 @@ export const api = {
   },
   categories: () => request<import("@/types").CategoryOut[]>("/catalog/categories"),
   counters: () => request<import("@/types").CounterOut[]>("/counters"),
-  customers: () => request<import("@/types").Paginated<import("@/types").CustomerOut>>("/customers"),
-  loyaltyAccounts: () =>
-    request<import("@/types").Paginated<import("@/types").LoyaltyAccountOut>>("/loyalty/accounts"),
+  customers: (query = new URLSearchParams()) =>
+    request<import("@/types").Paginated<import("@/types").CustomerOut>>(`/customers?${query}`),
+  customer: (id: string) => request<import("@/types").CustomerOut>(`/customers/${encodeURIComponent(id)}`),
+  customerBalance: (id: string) => request<import("@/types").CustomerBalanceOut>(`/customers/${id}/balance`),
+  customerLoyalty: (id: string) => request<import("@/types").CustomerLoyaltyOut>(`/customers/${id}/loyalty`),
+  customerInvoices: (id: string, offset: number) => request<import("@/types").Paginated<import("@/types").InvoiceOut>>(`/customers/${id}/invoices?offset=${offset}`),
+  customerPayments: (id: string, offset: number) => request<import("@/types").Paginated<import("@/types").CustomerPaymentOut>>(`/customers/${id}/payments?offset=${offset}`),
+  customerStatement: (id: string, offset: number) => request<import("@/types").Paginated<import("@/types").CustomerLedgerEntryOut>>(`/customers/${id}/statement?offset=${offset}`),
+  customerLoyaltyHistory: (id: string, offset: number) => request<import("@/types").Paginated<import("@/types").LoyaltyEntryOut>>(`/customers/${id}/loyalty/transactions?offset=${offset}`),
+  loyaltyAccounts: (offset = 0) =>
+    request<import("@/types").Paginated<import("@/types").LoyaltyAccountOut>>("/loyalty/accounts?limit=24&offset=" + offset),
   invoices: () => request<import("@/types").Paginated<import("@/types").InvoiceOut>>("/invoices"),
 
   // ---- Phase 2B: session / employees / counter management ------------------

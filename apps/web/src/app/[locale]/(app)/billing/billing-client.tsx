@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Search,
   User,
@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
-import { ApiError, newIdempotencyKey } from "@/lib/api-client";
+import { ApiError, browserRequest, newIdempotencyKey } from "@/lib/api-client";
 import { formatBDT, localizedName, formatNumber } from "@/lib/format";
+import { fieldClass, localDigits, minorUnits, secondaryButton } from "@/components/ui/pos-form";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -23,6 +24,7 @@ import type {
   CustomerOut,
   InvoiceCreate,
   InvoiceCreateOut,
+  Paginated,
   ProductOut,
 } from "@/types";
 import type { Locale } from "@/i18n/config";
@@ -39,25 +41,54 @@ function parseDecimal(value: string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function BillingDialog({ titleId, dismiss, children }: {
+  titleId: string;
+  dismiss?: () => void;
+  children: ReactNode;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current;
+    element?.showModal();
+    return () => element?.close();
+  }, []);
+  return (
+    <dialog ref={dialog} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); dismiss?.(); }}
+      className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none items-end justify-center bg-transparent p-4 open:flex backdrop:bg-black/40 sm:items-center">
+      {children}
+    </dialog>
+  );
+}
+
 export function BillingClient({
   locale,
   products,
   counters,
   customers,
+  canRedeem,
 }: {
   locale: Locale;
   products: ProductOut[];
   counters: CounterOut[];
   customers: CustomerOut[];
+  canRedeem: boolean;
 }) {
   const t = useTranslations("billing");
+  const customersText = useTranslations("customers");
   const router = useRouter();
 
   // ----- cart state --------------------------------------------------------
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [counterId, setCounterId] = useState(counters[0]?.id ?? "");
-  const [customerId, setCustomerId] = useState("");
+  const [customer, setCustomer] = useState<CustomerOut | null>(null);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerSearch, setCustomerSearch] = useState<{ query: string; items: CustomerOut[]; failed?: boolean } | null>(null);
+  const [redeemInput, setRedeemInput] = useState("");
+  const [paymentMode, setPaymentMode] = useState<"full" | "partial" | "due">("full");
+  const [partial, setPartial] = useState("");
+  const [uncertain, setUncertain] = useState(false);
+  const pending = useRef<InvoiceCreate | null>(null);
   const [discount, setDiscount] = useState("0");
   const [payMethod, setPayMethod] = useState<PayMethod>("cash");
   const [confirming, setConfirming] = useState(false);
@@ -78,6 +109,26 @@ export function BillingClient({
     };
   }, [modalOpen]);
 
+  const customerTerm = customerQuery.trim();
+  useEffect(() => {
+    if (!customerTerm) return;
+    const abort = new AbortController();
+    const timer = setTimeout(async () => {
+      const query = new URLSearchParams({ q: customerTerm, active: "true", limit: "30" });
+      try {
+        const matches = await browserRequest<Paginated<CustomerOut>>("/api/customers?" + query, { signal: abort.signal });
+        if (!abort.signal.aborted) setCustomerSearch({ query: customerTerm, items: matches.items });
+      } catch {
+        if (!abort.signal.aborted) setCustomerSearch({ query: customerTerm, items: [], failed: true });
+      }
+    }, 250);
+    return () => { clearTimeout(timer); abort.abort(); };
+  }, [customerTerm]);
+  const loadingCustomers = Boolean(customerTerm && customerSearch?.query !== customerTerm);
+  const customerOptions = customerTerm ? (loadingCustomers ? [] : customerSearch?.items ?? []) : customers;
+  const candidates = customer && !customerOptions.some((row) => row.id === customer.id)
+    ? [customer, ...customerOptions] : customerOptions;
+
   // ----- derived -----------------------------------------------------------
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,13 +142,33 @@ export function BillingClient({
     );
   }, [products, query]);
 
-  const subtotal = useMemo(
-    () => cart.reduce((sum, l) => sum + parseDecimal(l.product.price) * l.qty, 0),
-    [cart],
-  );
-  const discountNum = Math.max(0, parseDecimal(discount));
-  const total = Math.max(0, subtotal - discountNum);
-  const canSubmit = cart.length > 0 && counterId !== "" && total > 0 && !submitting;
+  const totals = cart.reduce((sum, line) => {
+    const amount = (minorUnits(line.product.price ?? "") ?? 0) * line.qty;
+    return {
+      subtotal: sum.subtotal + amount,
+      eligible: sum.eligible + (line.product.loyalty_eligible ? amount : 0),
+    };
+  }, { subtotal: 0, eligible: 0 });
+  const manual = minorUnits(discount || "0");
+  const discountInvalid = manual === null || manual > 99_999_999 || (cart.length > 0 && manual >= totals.subtotal);
+  const maxPoints = customer && customer.points_balance >= 300 && canRedeem
+    ? Math.max(0, Math.min(Math.floor(customer.points_balance / 100), Math.floor((totals.eligible - (manual ?? 0)) / 10000)) * 100)
+    : 0;
+  const redeemText = localDigits(redeemInput.trim());
+  const redeemPoints = redeemText ? Number(redeemText) : 0;
+  const redemptionInvalid = !/^\d*$/.test(redeemText) || !Number.isSafeInteger(redeemPoints) ||
+    redeemPoints > maxPoints || redeemPoints % 100 !== 0;
+  const totalCents = Math.max(0, totals.subtotal - (manual ?? 0) - (redemptionInvalid ? 0 : redeemPoints * 100));
+  const partialCents = minorUnits(partial);
+  const partialInvalid = paymentMode === "partial" &&
+    (partialCents === null || partialCents <= 0 || partialCents >= totalCents || partialCents > 9_999_999_999);
+  const paidCents = paymentMode === "full" ? totalCents : paymentMode === "partial" ? partialCents ?? 0 : 0;
+  const dueCents = Math.max(0, totalCents - paidCents);
+  const subtotal = totals.subtotal / 100;
+  const discountNum = (manual ?? 0) / 100;
+  const total = totalCents / 100;
+  const canSubmit = cart.length > 0 && counterId !== "" && !discountInvalid && !redemptionInvalid
+    && !partialInvalid && (paymentMode === "full" || (Boolean(customer?.phone) && totalCents > 0)) && !submitting;
 
   // ----- cart ops ----------------------------------------------------------
   function addToCart(product: ProductOut) {
@@ -130,7 +201,14 @@ export function BillingClient({
 
   function resetBill() {
     setCart([]);
-    setCustomerId("");
+    setCustomer(null);
+    setCustomerQuery("");
+    setCustomerSearch(null);
+    setRedeemInput("");
+    setPaymentMode("full");
+    setPartial("");
+    setUncertain(false);
+    pending.current = null;
     setDiscount("0");
     setPayMethod("cash");
     setErrorCode(null);
@@ -144,18 +222,23 @@ export function BillingClient({
 
   // ----- submit -------------------------------------------------------------
   async function submit() {
+    if (submitting) return;
     setSubmitting(true);
     setErrorCode(null);
-    const body: InvoiceCreate = {
+    const body: InvoiceCreate = pending.current ?? {
       counter_id: counterId,
-      customer_id: customerId || null,
+      customer_id: customer?.id ?? null,
       items: cart.map((l) => ({
         product_id: l.product.id,
         quantity: String(l.qty),
+        line_discount: "0",
       })),
       discount_total: discountNum.toFixed(2),
-      payments: [{ method: payMethod }],
+      payments: paidCents === 0 ? [] : [{ method: payMethod, ...(paymentMode === "partial" ? { amount: (paidCents / 100).toFixed(2) } : {}) }],
+      allow_due: paymentMode !== "full",
+      redeem_points: redeemPoints,
     };
+    pending.current = body;
     try {
       const res = await fetch("/api/billing/invoices", {
         method: "POST",
@@ -165,7 +248,7 @@ export function BillingClient({
         },
         body: JSON.stringify(body),
       });
-      const payload = await res.json().catch(() => ({}));
+      const payload = await res.json();
       if (!res.ok) {
         throw new ApiError(
           payload.error ?? `HTTP ${res.status}`,
@@ -174,22 +257,24 @@ export function BillingClient({
           payload.details ?? {},
         );
       }
+      pending.current = null;
+      setUncertain(false);
       setReceipt(payload as InvoiceCreateOut);
       setConfirming(false);
-      setCart([]);
     } catch (err) {
-      setConfirming(false);
-      if (err instanceof ApiError) {
-        // The route group normally gates auth, but a token can expire mid-shift —
-        // a 401 means the session is gone, so send the cashier back to /login.
-        if (err.status === 401) {
-          router.replace("/login");
-          return;
-        }
-        setErrorCode(err.code || "unknown");
-      } else {
-        setErrorCode("network");
+      if (!(err instanceof ApiError) || err.status >= 500) {
+        setUncertain(true);
+        setErrorCode("retryBill");
+        return;
       }
+      pending.current = null;
+      setUncertain(false);
+      setConfirming(false);
+      if (err.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      setErrorCode(err.code || "unknown");
     } finally {
       setSubmitting(false);
     }
@@ -209,6 +294,9 @@ export function BillingClient({
           </p>
         </div>
 
+        {cart.length > 0 && (
+          <a href="#checkout-cart" className={secondaryButton + " sticky top-16 z-10 mb-3 lg:hidden"}>{t("viewCart", { count: cart.length })}</a>
+        )}
         <label className="mb-4 flex min-h-[52px] items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] px-4">
               <Search className="h-5 w-5 text-[var(--color-muted-foreground)]" aria-hidden="true" />
               <input
@@ -234,7 +322,7 @@ export function BillingClient({
                       data-sku={p.sku}
                       data-stock={p.stock_on_hand}
                       data-name={localizedName(p.name_en, p.name_bn, locale)}
-                      className="min-h-[96px] rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3 text-left transition-colors duration-150 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-050)] disabled:opacity-50"
+                      className="min-h-[96px] cursor-pointer rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3 text-left transition-colors duration-150 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-050)] disabled:opacity-50"
                     >
                       <p className="line-clamp-2 text-sm font-semibold">
                         {localizedName(p.name_en, p.name_bn, locale)}
@@ -255,7 +343,8 @@ export function BillingClient({
       </div>
 
       {/* ------------------------- right: cart -------------------------- */}
-      <Card className="h-fit min-w-0 lg:sticky lg:top-20">
+      <div id="checkout-cart" className="h-fit min-w-0 scroll-mt-28 lg:sticky lg:top-20">
+      <Card>
         <CardHeader>
           <CardTitle>{t("cart")}</CardTitle>
           <Badge variant="outline">
@@ -281,25 +370,39 @@ export function BillingClient({
           </select>
         </label>
 
-        {/* customer selector */}
-        <label className="mb-3 block">
-          <span className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
-            <User className="h-3.5 w-3.5" aria-hidden="true" /> {t("customer")}
-          </span>
-          <select
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            className="min-h-[44px] w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 text-sm font-medium"
-          >
-            <option value="">{t("noCustomer")}</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.points_balance ? ` (${c.points_balance} pts)` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="mb-3 space-y-2">
+          <label className="block text-sm font-medium">
+            <span className="mb-1 block">{t("searchCustomers")}</span>
+            <input type="search" value={customerQuery} maxLength={160} className={fieldClass}
+              onChange={(event) => setCustomerQuery(event.target.value)} />
+          </label>
+          <div>
+            <label htmlFor="billing-customer" className="mb-1 flex items-center gap-1 text-sm font-medium">
+              <User size={15} aria-hidden="true" />{t("customer")}
+            </label>
+            <select id="billing-customer" value={customer?.id ?? ""} className={fieldClass}
+              onChange={(event) => {
+                const picked = candidates.find((row) => row.id === event.target.value) ?? null;
+                setCustomer(picked);
+                setRedeemInput("");
+                if (!picked?.phone) setPaymentMode("full");
+              }}>
+              <option value="">{t("noCustomer")}</option>
+              {candidates.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {localizedName(row.name, row.name_bn, locale)}{row.phone ? " · " + row.phone : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          {customerTerm && (
+            <p className="text-xs text-[var(--color-muted-foreground)]" role="status">
+              {loadingCustomers ? t("loadingCustomers") : customerSearch?.failed ? t("errors.network") :
+                t("customerMatches", { count: customerOptions.length })}
+            </p>
+          )}
+          {customer && <p className="text-sm font-medium">{t("openingPoints", { count: customer.points_balance })}</p>}
+        </div>
 
         {/* cart lines */}
         {cart.length === 0 ? (
@@ -321,18 +424,18 @@ export function BillingClient({
                     type="button"
                     aria-label={`${t("qty")} −`}
                     onClick={() => setQty(l.product.id, l.qty - 1)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-muted)]"
                   >
                     <Minus className="h-4 w-4" aria-hidden="true" />
                   </button>
-                  <span className="w-10 text-center text-sm font-bold tabular-nums">
+                  <span className="w-6 text-center text-sm font-bold tabular-nums">
                     {l.qty}
                   </span>
                   <button
                     type="button"
                     aria-label={`${t("qty")} +`}
                     onClick={() => setQty(l.product.id, l.qty + 1)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-muted)]"
                   >
                     <Plus className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -340,12 +443,12 @@ export function BillingClient({
                     type="button"
                     aria-label={t("remove")}
                     onClick={() => removeLine(l.product.id)}
-                    className="ml-1 flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50"
+                    className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-red-600 hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
-                <p className="w-16 text-right text-sm font-bold tabular-nums">
+                <p className="min-w-12 text-right text-sm font-bold tabular-nums">
                   {formatBDT(parseDecimal(l.product.price) * l.qty)}
                 </p>
               </li>
@@ -359,14 +462,31 @@ export function BillingClient({
             {t("discountLabel")}
           </span>
           <input
-            type="number"
-            min={0}
-            step="0.01"
+            inputMode="decimal"
+            aria-invalid={discountInvalid}
+            aria-describedby={discountInvalid ? "billing-discount-error" : undefined}
             value={discount}
             onChange={(e) => setDiscount(e.target.value)}
             className="min-h-[44px] w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 text-sm font-medium tabular-nums"
           />
         </label>
+
+        {discountInvalid && <p id="billing-discount-error" className="mt-1 text-sm text-red-700">{t("invalidDiscount")}</p>}
+
+        {customer && canRedeem && (
+          <div className="mt-3 space-y-1">
+            <label className="block text-sm font-medium">
+              <span className="mb-1 block">{t("redeem")}</span>
+              <input inputMode="numeric" value={redeemInput} onChange={(event) => setRedeemInput(event.target.value)}
+                className={fieldClass} placeholder="0" disabled={!maxPoints && !redeemInput}
+                aria-invalid={redemptionInvalid} aria-describedby="billing-redemption-hint" />
+            </label>
+            <p id="billing-redemption-hint" className={"text-xs " + (redemptionInvalid ? "text-red-700" : "text-[var(--color-muted-foreground)]")}>
+              {customer.points_balance < 300 ? t("redemptionLocked")
+                : maxPoints ? t("redemptionRange", { max: maxPoints }) : t("redemptionIneligible")}
+            </p>
+          </div>
+        )}
 
         {/* totals */}
         <dl className="mt-4 space-y-2 border-t border-[var(--color-border)] pt-4 text-sm">
@@ -378,6 +498,9 @@ export function BillingClient({
             <dt>{t("discount")}</dt>
             <dd className="tabular-nums text-red-600">−{formatBDT(discountNum)}</dd>
           </div>
+          {!redemptionInvalid && redeemPoints > 0 && <div className="flex justify-between gap-2">
+            <dt>{t("loyaltyDiscount")}</dt><dd className="tabular-nums">−{formatBDT(redeemPoints)}</dd>
+          </div>}
           <div className="flex justify-between text-base font-bold">
             <dt>{t("total")}</dt>
             <dd className="tabular-nums text-[var(--color-primary)]">
@@ -386,7 +509,30 @@ export function BillingClient({
           </div>
         </dl>
 
-        {/* payment method */}
+        <div className="mt-4 space-y-1">
+          <label htmlFor="billing-payment-type" className="block text-sm font-medium">{t("paymentType")}</label>
+          <select id="billing-payment-type" value={paymentMode} className={fieldClass}
+            onChange={(event) => setPaymentMode(event.target.value as typeof paymentMode)}>
+            <option value="full">{t("paymentFull")}</option>
+            <option value="partial" disabled={!customer?.phone}>{t("paymentPartial")}</option>
+            <option value="due" disabled={!customer?.phone}>{t("paymentDue")}</option>
+          </select>
+        </div>
+        {!customer?.phone && <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">{t("customerRequiredForDue")}</p>}
+        {paymentMode === "partial" && (
+          <div className="mt-3 space-y-1">
+            <label htmlFor="billing-payment-amount" className="block text-sm font-medium">{t("amountReceived")}</label>
+            <input id="billing-payment-amount" inputMode="decimal" value={partial} className={fieldClass}
+              onChange={(event) => setPartial(event.target.value)} aria-invalid={partialInvalid && partial !== ""}
+              aria-describedby={partialInvalid && partial !== "" ? "billing-partial-error" : undefined} />
+            {partialInvalid && partial !== "" && <p id="billing-partial-error" className="text-xs text-red-700">{t("invalidPartial")}</p>}
+          </div>
+        )}
+        {paymentMode !== "full" && <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+          <span>{t("remainingDue")}</span><span className="tabular-nums">{formatBDT(dueCents / 100)}</span>
+        </div>}
+
+        {paymentMode !== "due" && totalCents > 0 && <>
         <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
           {t("payWith")}
         </p>
@@ -397,7 +543,7 @@ export function BillingClient({
               type="button"
               onClick={() => setPayMethod(m)}
               aria-pressed={payMethod === m}
-              className={`min-h-[44px] rounded-lg border text-xs font-semibold transition-colors duration-150 ${
+              className={`min-h-[44px] cursor-pointer rounded-lg border text-xs font-semibold transition-colors duration-150 ${
                 payMethod === m
                   ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
                   : "border-[var(--color-border)] hover:bg-[var(--color-primary-100)]"
@@ -408,15 +554,17 @@ export function BillingClient({
           ))}
         </div>
 
+        </>}
+
         {/* error surface */}
-        {errorCode ? (
+        {errorCode && !confirming ? (
           <p
             role="alert"
             data-testid="billing-error"
             className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            {t(`errors.${errorCode}` as never)}
+            {t.has("errors." + errorCode) ? t("errors." + errorCode) : t("errors.unknown")}
           </p>
         ) : null}
 
@@ -425,20 +573,16 @@ export function BillingClient({
           type="button"
           disabled={!canSubmit}
           onClick={() => setConfirming(true)}
-          className="mt-4 min-h-[52px] w-full rounded-xl bg-[var(--color-primary)] text-base font-bold text-white transition-colors duration-150 hover:bg-[var(--color-primary-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-4 min-h-[52px] w-full cursor-pointer rounded-xl bg-[var(--color-primary)] text-base font-bold text-white transition-colors duration-150 hover:bg-[var(--color-primary-strong)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t("finalize")}
         </button>
       </Card>
+      </div>
 
       {/* ------------------------- confirm dialog ------------------------ */}
       {confirming && !receipt ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="billing-confirm-title"
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
-        >
+        <BillingDialog titleId="billing-confirm-title" dismiss={submitting || uncertain ? undefined : () => setConfirming(false)}>
           <div className="flex max-h-[90dvh] w-full max-w-md flex-col rounded-2xl bg-[var(--color-card)] shadow-xl">
             <div className="flex items-start justify-between p-5 pb-0">
               <h2 id="billing-confirm-title" className="text-lg font-bold">
@@ -448,7 +592,8 @@ export function BillingClient({
                 type="button"
                 aria-label={t("cancel")}
                 onClick={() => setConfirming(false)}
-                className="rounded-lg p-1 hover:bg-[var(--color-muted)]"
+                disabled={submitting || uncertain}
+                className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg hover:bg-[var(--color-muted)] disabled:opacity-50"
               >
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -466,25 +611,33 @@ export function BillingClient({
                   <dt>{t("discount")}</dt>
                   <dd className="tabular-nums">−{formatBDT(discountNum)}</dd>
                 </div>
+                {redeemPoints > 0 && <div className="flex justify-between gap-2">
+                  <dt>{t("loyaltyDiscount")}</dt><dd className="tabular-nums">−{formatBDT(redeemPoints)}</dd>
+                </div>}
                 <div className="flex justify-between text-base font-bold">
                   <dt>{t("total")}</dt>
                   <dd className="tabular-nums text-[var(--color-primary)]">
                     {formatBDT(total)}
                   </dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt>{t("payWith")}</dt>
-                  <dd className="font-medium">
-                    {t(`pay${payMethod[0].toUpperCase()}${payMethod.slice(1)}` as never)}
-                  </dd>
+                <div className="flex justify-between gap-2">
+                  <dt>{t("amountReceived")}</dt><dd>{formatBDT(paidCents / 100)}</dd>
                 </div>
+                {dueCents > 0 && <div className="flex justify-between gap-2">
+                  <dt>{t("remainingDue")}</dt><dd>{formatBDT(dueCents / 100)}</dd>
+                </div>}
+                {paidCents > 0 && <div className="flex justify-between gap-2">
+                  <dt>{t("payWith")}</dt>
+                  <dd>{t(({ cash: "payCash", bkash: "payBkash", nagad: "payNagad" } as const)[payMethod])}</dd>
+                </div>}
               </dl>
+              {uncertain && <p role="alert" className="pb-3 text-sm text-red-700">{t("errors.retryBill")}</p>}
             </div>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--color-border)] p-4">
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                disabled={submitting}
+                disabled={submitting || uncertain}
                 className="min-h-[48px] rounded-xl border border-[var(--color-border)] text-sm font-semibold hover:bg-[var(--color-muted)] disabled:opacity-50"
               >
                 {t("cancel")}
@@ -495,21 +648,16 @@ export function BillingClient({
                 disabled={submitting}
                 className="min-h-[48px] rounded-xl bg-[var(--color-primary)] text-sm font-bold text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-60"
               >
-                {submitting ? t("processing") : t("confirm")}
+                {submitting ? t("processing") : uncertain ? t("retry") : t("confirm")}
               </button>
             </div>
           </div>
-        </div>
+        </BillingDialog>
       ) : null}
 
       {/* ------------------------- success receipt ----------------------- */}
       {receipt ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="billing-success-title"
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
-        >
+        <BillingDialog titleId="billing-success-title" dismiss={resetBill}>
           <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-[var(--color-card)] p-6 text-center shadow-xl">
             <CheckCircle2
               className="mx-auto h-14 w-14 text-[var(--color-primary)]"
@@ -521,6 +669,7 @@ export function BillingClient({
             <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
               {t("successNumber", { number: receipt.invoice_number })}
             </p>
+            <div className="mt-2"><Badge variant={receipt.payment_status === "paid" ? "success" : "warning"}>{customersText("paymentStatus." + receipt.payment_status)}</Badge></div>
             <dl className="mx-auto mt-4 max-w-xs space-y-1 text-sm">
               <div className="flex justify-between">
                 <dt>{t("successTotal")}</dt>
@@ -528,23 +677,18 @@ export function BillingClient({
                   {formatBDT(receipt.total)}
                 </dd>
               </div>
-              {receipt.loyalty_points_earned > 0 ? (
-                <>
-                  <div className="flex justify-between">
-                    <dt>{t("successPoints")}</dt>
-                    <dd className="font-medium">
-                      +{receipt.loyalty_points_earned} pts
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt>{t("successBalance")}</dt>
-                    <dd className="font-medium">
-                      {receipt.loyalty_points_balance} pts
-                    </dd>
-                  </div>
-                </>
-              ) : null}
+              {Number(receipt.loyalty_discount) > 0 && <div className="flex justify-between gap-2"><dt>{t("loyaltyDiscount")}</dt><dd>−{formatBDT(receipt.loyalty_discount)}</dd></div>}
+              <div className="flex justify-between gap-2"><dt>{t("amountReceived")}</dt><dd>{formatBDT(receipt.paid_total)}</dd></div>
+              <div className="flex justify-between gap-2"><dt>{t("remainingDue")}</dt><dd>{formatBDT(receipt.due_total)}</dd></div>
+              {receipt.loyalty_points_balance !== null && <>
+                <div className="flex justify-between gap-2"><dt>{t("successPoints")}</dt><dd>+{receipt.loyalty_points_earned}</dd></div>
+                <div className="flex justify-between gap-2"><dt>{t("successRedeemed")}</dt><dd>{receipt.loyalty_points_redeemed}</dd></div>
+                <div className="flex justify-between gap-2"><dt>{t("successBalance")}</dt><dd>{receipt.loyalty_points_balance}</dd></div>
+              </>}
             </dl>
+            {Number(receipt.due_total) > 0 && receipt.loyalty_points_balance !== null && (
+              <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">{t("earnOnSettlement")}</p>
+            )}
             <button
               type="button"
               onClick={resetBill}
@@ -553,7 +697,7 @@ export function BillingClient({
               {t("newBill")}
             </button>
           </div>
-        </div>
+        </BillingDialog>
       ) : null}
     </div>
   );

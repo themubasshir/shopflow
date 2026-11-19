@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_DIR = Path(__file__).resolve().parents[2]
@@ -18,6 +18,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        hide_input_in_errors=True,
     )
 
     app_name: str = "ShopFlow API"
@@ -41,11 +42,31 @@ class Settings(BaseSettings):
     # When enabled, unauthenticated read endpoints fall back to a demo manager
     # principal (Phase 1 behaviour). Write endpoints never use it. Flip off for
     # production so every request is authenticated.
-    demo_mode: bool = True
+    demo_mode: bool = False
 
     # Brute-force login protection: per identity+IP sliding window.
     login_rate_limit_attempts: int = 5
     login_rate_limit_window_seconds: int = 300
+
+    @field_validator("environment")
+    @classmethod
+    def normalize_environment(cls, value: str) -> str:
+        return value.strip().lower()
+
+    @model_validator(mode="after")
+    def validate_deployment(self) -> Settings:
+        if self.environment not in {"development", "test"}:
+            if self.demo_mode:
+                raise ValueError("DEMO_MODE is allowed only in development and test")
+            if (
+                self.debug
+                or len(self.secret_key) < 32
+                or self.secret_key.startswith(("dev-only", "CHANGE_ME"))
+            ):
+                raise ValueError(
+                    "Use a strong SECRET_KEY and disable DEBUG outside development and test"
+                )
+        return self
 
     @field_validator("default_locale")
     @classmethod

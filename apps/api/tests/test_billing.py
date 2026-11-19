@@ -1,33 +1,45 @@
-"""Phase 2A billing tests — run against the real shopflow_dev PostgreSQL DB.
+"""Billing tests against the isolated, real shopflow_test PostgreSQL database.
 
 Isolation: every product this module creates is marked inactive afterwards
 (invoice_items hold RESTRICT FKs, so hard deletes are impossible). Seeded
-development products are never sold, so seed data stays intact.
+test fixture products are never sold, so seed data stays intact.
 """
 
 from __future__ import annotations
 
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import func, select
+from fastapi import HTTPException
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select, text, update
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import Principal
+from app.core.config import settings
 from app.core.errors import (
     IdempotencyConflictError,
     InsufficientStockError,
+    LoyaltyError,
     NotFoundError,
     ValidationError,
 )
 from app.db.session import SessionLocal
+from app.main import app
 from app.models import (
     Category,
     Counter,
     Customer,
+    CustomerLedgerEntry,
+    IdempotencyRecord,
+    Invoice,
     LoyaltyAccount,
+    LoyaltyRedemption,
     LoyaltyTransaction,
     Product,
     ProductUnit,
@@ -36,8 +48,12 @@ from app.models import (
     StockMovement,
     User,
 )
+from app.schemas.customers import CustomerCreate, CustomerUpdate, DuePaymentCreate
 from app.schemas.sales import InvoiceCreate, InvoiceItemCreate, PaymentCreate
+from app.services import billing
 from app.services.billing import finalize_invoice
+from app.services.customers import create_customer, update_customer
+from app.services.receivables import CreditLimitError, OverpaymentError, collect_due_payment
 
 # ---------------------------------------------------------------- fixtures
 
@@ -346,8 +362,6 @@ def test_invalid_product_rejected(manager_principal, counter):
 
 def test_unauthorized_cashier_cannot_bill(manager_principal, counter):
     """T9 — a principal without sales:write is refused before any write."""
-    from fastapi import HTTPException
-
     viewer = Principal(
         user_id=manager_principal.user_id,
         shop_id=manager_principal.shop_id,
@@ -517,3 +531,580 @@ def test_split_payment_must_equal_total(manager_principal, counter, make_product
     )
     with pytest.raises(ValidationError, match="exactly equal"):
         _create(manager_principal, underpaid)
+
+
+@pytest.fixture
+def account_customer(manager_principal):
+    def make(points=0, limit="0"):
+        with SessionLocal() as db:
+            customer = create_customer(
+                db,
+                manager_principal,
+                CustomerCreate(
+                    name="Phase 2C Test",
+                    phone=f"015{uuid.uuid4().int % 100000000:08d}",
+                    credit_limit=Decimal(limit),
+                ),
+            )
+            account = db.scalar(
+                select(LoyaltyAccount).where(LoyaltyAccount.customer_id == customer.id)
+            )
+            if points:
+                account.points_balance = account.lifetime_earned = points
+                db.add(
+                    LoyaltyTransaction(
+                        account_id=account.id,
+                        transaction_type="earn",
+                        points=points,
+                        balance_after=points,
+                    )
+                )
+                db.commit()
+            return customer.id, account.id
+
+    return make
+
+
+def _checkout(
+    counter, products, *, customer=None, points=0, payments=None, allow_due=False, discount="0"
+):
+    return InvoiceCreate(
+        counter_id=counter.id,
+        customer_id=customer,
+        items=[_item(product, unit) for product, unit in products],
+        redeem_points=points,
+        payments=[PaymentCreate(method="cash")] if payments is None else payments,
+        allow_due=allow_due,
+        discount_total=Decimal(discount),
+    )
+
+
+@pytest.mark.parametrize(
+    ("opening", "redeem", "price"),
+    [
+        (299, 100, "50000"),  # Would reach the threshold through this sale's earnings.
+        (300, 101, "850"),
+        (300, 400, "850"),
+        (700, 700, "699.99"),
+    ],
+)
+def test_redemption_rejects_invalid_opening_balance_increment_or_eligible_cap(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+    opening,
+    redeem,
+    price,
+):
+    customer, account = account_customer(opening)
+    product = make_product(price=price)
+    with pytest.raises(LoyaltyError):
+        _create(manager_principal, _checkout(counter, [product], customer=customer, points=redeem))
+    with SessionLocal() as db:
+        assert db.get(LoyaltyAccount, account).points_balance == opening
+        assert (
+            db.scalar(
+                select(func.count()).select_from(Invoice).where(Invoice.customer_id == customer)
+            )
+            == 0
+        )
+    assert _stock(product[0].id) == Decimal("10")
+
+
+@pytest.mark.parametrize("amount", [-1, -100, 100.5])
+def test_redemption_schema_rejects_negative_or_fractional_points(counter, make_product, amount):
+    valid = _checkout(counter, [make_product()])
+    from pydantic import ValidationError as SchemaError
+
+    with pytest.raises(SchemaError):
+        InvoiceCreate.model_validate({**valid.model_dump(), "redeem_points": amount})
+
+
+def test_redeem_at_exactly_300_and_award_only_on_eligible_net(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, account = account_customer(300)
+    eligible = make_product(price="450")
+    excluded_by_category = make_product(price="850", eligible=False)
+    excluded_by_product = make_product(price="850")
+    with SessionLocal() as db:
+        db.get(Product, excluded_by_product[0].id).loyalty_eligible = False
+        db.commit()
+    out = _create(
+        manager_principal,
+        _checkout(
+            counter,
+            [eligible, excluded_by_category, excluded_by_product],
+            customer=customer,
+            points=100,
+            discount="55",
+        ),
+    )
+    assert out.loyalty_discount == Decimal("100")
+    assert out.total == Decimal("1995")
+    assert out.loyalty_points_earned == 2
+    assert out.loyalty_points_balance == 202
+    with SessionLocal() as db:
+        sales = db.get(Invoice, out.id)
+        assert sales.loyalty_earn_base == Decimal("295")
+        assert sales.loyalty_rule_snapshot["min_redeem_balance"] == 300
+        assert sales.loyalty_rule_snapshot["point_value_bdt"] == "1.00"
+        transactions = db.scalars(
+            select(LoyaltyTransaction)
+            .where(LoyaltyTransaction.invoice_id == out.id)
+            .order_by(LoyaltyTransaction.ledger_sequence)
+        ).all()
+        assert [(t.transaction_type, t.points, t.balance_after) for t in transactions] == [
+            ("redeem", -100, 200),
+            ("earn", 2, 202),
+        ]
+        assert db.get(LoyaltyAccount, account).points_balance == sum(
+            db.scalars(
+                select(LoyaltyTransaction.points).where(LoyaltyTransaction.account_id == account)
+            )
+        )
+
+
+def test_redemption_can_cover_entire_invoice(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, _ = account_customer(300)
+    out = _create(
+        manager_principal,
+        _checkout(
+            counter,
+            [make_product(price="200")],
+            customer=customer,
+            points=200,
+            payments=[],
+        ),
+    )
+    assert out.payment_status == "paid"
+    assert out.total == out.due_total == out.paid_total == Decimal(0)
+    assert out.payments == []
+    assert out.loyalty_points_redeemed == 200
+    assert out.loyalty_points_earned == 0
+
+
+def _race(*operations):
+    barrier = threading.Barrier(len(operations))
+
+    def compete(operation):
+        with SessionLocal() as db:
+            db.execute(text("SET LOCAL lock_timeout = '8s'"))
+            barrier.wait(timeout=10)
+            try:
+                return operation(db)
+            except (LoyaltyError, OverpaymentError, CreditLimitError) as exc:
+                return exc
+
+    with ThreadPoolExecutor(max_workers=len(operations)) as executor:
+        futures = [executor.submit(compete, operation) for operation in operations]
+        return [future.result(timeout=20) for future in futures]
+
+
+def _second_counter(shop, counter):
+    with SessionLocal() as db:
+        return db.scalars(
+            select(Counter)
+            .where(Counter.shop_id == shop.id, Counter.id != counter.id)
+            .order_by(Counter.sort_order)
+        ).first()
+
+
+def test_two_counters_cannot_redeem_same_opening_balance(
+    shop,
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, account = account_customer(300)
+    other = _second_counter(shop, counter)
+    first_body = _checkout(counter, [make_product(price="500")], customer=customer, points=300)
+    second_body = _checkout(other, [make_product(price="500")], customer=customer, points=300)
+    outcomes = _race(
+        *[
+            lambda db, body=body: finalize_invoice(db, manager_principal, body, _key())
+            for body in (first_body, second_body)
+        ]
+    )
+    assert sum(isinstance(item, LoyaltyError) for item in outcomes) == 1
+    with SessionLocal() as db:
+        assert db.get(LoyaltyAccount, account).points_balance == 2
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(LoyaltyRedemption)
+                .where(LoyaltyRedemption.account_id == account)
+            )
+            == 1
+        )
+
+
+def test_concurrent_identical_checkout_keys_share_persisted_redemption_and_payment_ids(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, account = account_customer(300)
+    product = make_product(price="500")
+    body = _checkout(counter, [product], customer=customer, points=100)
+    key = _key()
+
+    def sale(db):
+        return finalize_invoice(db, manager_principal, body, key)
+
+    first, second = _race(sale, sale)
+    assert first.id == second.id
+    assert (
+        first.payments[0].id
+        == second.payments[0].id
+        == _create(manager_principal, body, key).payments[0].id
+    )
+    assert first.items[0].id == second.items[0].id
+    assert sorted([first.idempotent_replay, second.idempotent_replay]) == [False, True]
+    assert _stock(product[0].id) == Decimal("9")
+    with SessionLocal() as db:
+        assert db.get(LoyaltyAccount, account).points_balance == 204
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(LoyaltyRedemption)
+                .where(LoyaltyRedemption.account_id == account)
+            )
+            == 1
+        )
+
+
+def test_redemption_rolls_back_with_flushed_invoice_stock_and_ledger(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+    monkeypatch,
+):
+    customer, account = account_customer(300)
+    product = make_product(price="500")
+    original = billing.record_redemption
+
+    def fail_after_write(db, *args):
+        original(db, *args)
+        db.flush()
+        raise RuntimeError("simulated invoice failure")
+
+    monkeypatch.setattr(billing, "record_redemption", fail_after_write)
+    key = _key()
+    with pytest.raises(RuntimeError, match="simulated"):
+        _create(
+            manager_principal, _checkout(counter, [product], customer=customer, points=100), key
+        )
+    assert _stock(product[0].id) == Decimal("10")
+    with SessionLocal() as db:
+        assert db.get(LoyaltyAccount, account).points_balance == 300
+        assert db.scalar(select(Invoice).where(Invoice.idempotency_key == key)) is None
+        assert (
+            db.scalar(select(IdempotencyRecord).where(IdempotencyRecord.idempotency_key == key))
+            is None
+        )
+        assert (
+            db.scalar(select(LoyaltyRedemption).where(LoyaltyRedemption.account_id == account))
+            is None
+        )
+        assert (
+            db.scalar(select(StockMovement).where(StockMovement.product_id == product[0].id))
+            is None
+        )
+
+
+def _payment(db, principal, customer, invoice, amount, *, key=None, method="cash"):
+    return collect_due_payment(
+        db,
+        principal,
+        customer,
+        invoice,
+        DuePaymentCreate(method=method, amount=Decimal(amount)),
+        key or _key(),
+    )
+
+
+def test_partial_payment_collections_and_direct_ledger_reconciliation(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, account = account_customer()
+    out = _create(
+        manager_principal,
+        _checkout(
+            counter,
+            [make_product(price="750")],
+            customer=customer,
+            allow_due=True,
+            payments=[PaymentCreate(method="cash", amount=Decimal("100"))],
+        ),
+    )
+    assert (out.payment_status, out.paid_total, out.due_total) == (
+        "partially_paid",
+        Decimal(100),
+        Decimal(650),
+    )
+    assert out.loyalty_points_earned == 0
+    with SessionLocal() as db:
+        assert db.get(LoyaltyAccount, account).points_balance == 0
+        first = _payment(db, manager_principal, customer, out.id, "150", method="bkash")
+        assert (first.outstanding_due, first.paid_total, first.loyalty_points_earned) == (
+            Decimal(500),
+            Decimal(250),
+            0,
+        )
+
+        # Editing the current product eligibility must not change the sale's reward.
+        product = db.get(Product, out.items[0].product_id)
+        product.loyalty_eligible = False
+        db.commit()
+        update_customer(db, manager_principal, customer, CustomerUpdate(is_active=False))
+        with pytest.raises(OverpaymentError):
+            _payment(db, manager_principal, customer, out.id, "500.01")
+        db.rollback()
+        key = _key()
+        last = _payment(db, manager_principal, customer, out.id, "500", key=key, method="nagad")
+        assert (last.payment_status, last.outstanding_due, last.loyalty_points_earned) == (
+            "paid",
+            Decimal(0),
+            7,
+        )
+        replay = _payment(
+            db, manager_principal, customer, out.id, "500.00", key=key, method="nagad"
+        )
+        assert replay.idempotent_replay
+        assert replay.payment.id == last.payment.id
+    with SessionLocal() as db:
+        assert db.scalar(text("SELECT current_database()")) == "shopflow_test"
+        entries = db.scalars(
+            select(CustomerLedgerEntry)
+            .where(CustomerLedgerEntry.customer_id == customer)
+            .order_by(CustomerLedgerEntry.id)
+        ).all()
+        assert [entry.amount for entry in entries] == [Decimal(650), Decimal(-150), Decimal(-500)]
+        invoice = db.get(Invoice, out.id)
+        assert sum(entry.amount for entry in entries) == invoice.due_total == 0
+        assert (
+            sum(p.amount for p in invoice.payments)
+            == invoice.paid_total
+            == invoice.total
+            == Decimal(750)
+        )
+        assert [p.method for p in sorted(invoice.payments, key=lambda p: p.paid_at)] == [
+            "cash",
+            "bkash",
+            "nagad",
+        ]
+        assert invoice.loyalty_points_earned == db.get(LoyaltyAccount, account).points_balance == 7
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(LoyaltyTransaction)
+                .where(LoyaltyTransaction.invoice_id == out.id)
+            )
+            == 1
+        )
+        with pytest.raises(IntegrityError, match="append-only"):
+            db.execute(
+                update(CustomerLedgerEntry)
+                .where(CustomerLedgerEntry.id == entries[0].id)
+                .values(amount=1)
+            )
+
+
+def test_due_only_invoice_and_concurrent_due_collection(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, account = account_customer(300)
+    out = _create(
+        manager_principal,
+        _checkout(
+            counter,
+            [make_product(price="450")],
+            customer=customer,
+            points=100,
+            payments=[],
+            allow_due=True,
+        ),
+    )
+    assert (out.payment_status, out.paid_total, out.due_total) == ("due", 0, Decimal(350))
+    assert out.loyalty_points_balance == 200
+    assert out.loyalty_points_earned == 0
+
+    def pay(db):
+        return _payment(db, manager_principal, customer, out.id, "350")
+
+    winner, loser = sorted(_race(pay, pay), key=lambda result: isinstance(result, Exception))
+    assert isinstance(loser, OverpaymentError)
+    assert winner.loyalty_points_earned == 3
+    with SessionLocal() as db:
+        assert db.get(LoyaltyAccount, account).points_balance == 203
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(CustomerLedgerEntry)
+                .where(CustomerLedgerEntry.invoice_id == out.id)
+            )
+            == 2
+        )
+
+
+def test_concurrent_due_collection_replays_the_same_payment_id(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, _ = account_customer()
+    out = _create(
+        manager_principal,
+        _checkout(
+            counter,
+            [make_product(price="380")],
+            customer=customer,
+            payments=[],
+            allow_due=True,
+        ),
+    )
+    key = _key()
+
+    def pay(db):
+        return _payment(db, manager_principal, customer, out.id, "380", key=key)
+
+    first, second = _race(pay, pay)
+    assert first.payment.id == second.payment.id
+    assert sorted([first.idempotent_replay, second.idempotent_replay]) == [False, True]
+    with SessionLocal() as db, pytest.raises(IdempotencyConflictError):
+        _payment(db, manager_principal, customer, out.id, "100", key=key)
+
+
+def test_credit_limit_is_serialized_across_counters(
+    shop,
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, _ = account_customer(limit="600")
+    bodies = [
+        _checkout(c, [make_product(price="400")], customer=customer, payments=[], allow_due=True)
+        for c in (counter, _second_counter(shop, counter))
+    ]
+    assert (
+        sum(
+            isinstance(result, CreditLimitError)
+            for result in _race(
+                *[
+                    lambda db, body=body: finalize_invoice(db, manager_principal, body, _key())
+                    for body in bodies
+                ]
+            )
+        )
+        == 1
+    )
+
+
+def test_anonymous_credit_and_checkout_overpayment_are_rejected(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, _ = account_customer()
+    product = make_product(price="100")
+    with pytest.raises(ValidationError, match="registered customer"):
+        _create(manager_principal, _checkout(counter, [product], payments=[], allow_due=True))
+    with pytest.raises(OverpaymentError):
+        _create(
+            manager_principal,
+            _checkout(
+                counter,
+                [product],
+                customer=customer,
+                allow_due=True,
+                payments=[PaymentCreate(method="nagad", amount=Decimal(101))],
+            ),
+        )
+    assert _stock(product[0].id) == Decimal(10)
+
+
+def test_checkout_financial_permissions(
+    manager_principal, cashier_principal, counter, make_product, account_customer
+):
+    customer, _ = account_customer(300)
+    body = _checkout(counter, [make_product(price="500")], customer=customer, points=100)
+    for principal, status in [
+        (cashier_principal, 403),
+        (replace(manager_principal, is_demo=True), 401),
+    ]:
+        with pytest.raises(HTTPException) as error:
+            _create(principal, body)
+        assert error.value.status_code == status
+
+
+@pytest.mark.anyio
+async def test_dashboard_returns_one_row_for_a_split_payment(
+    manager_principal,
+    counter,
+    make_product,
+    monkeypatch,
+):
+    out = _create(
+        manager_principal,
+        _checkout(
+            counter,
+            [make_product(price="305")],
+            payments=[
+                PaymentCreate(method="cash", amount=Decimal("100")),
+                PaymentCreate(method="bkash", amount=Decimal("205")),
+            ],
+        ),
+    )
+    monkeypatch.setattr(settings, "demo_mode", True)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/api/v1/reports/dashboard")
+    assert response.status_code == 200
+    recent = response.json()["recent_transactions"]
+    assert len({row["id"] for row in recent}) == len(recent)
+    assert [row["method"] for row in recent if row["id"] == str(out.id)] == ["bkash"]
+
+
+def test_loyalty_ledger_rows_are_immutable(
+    manager_principal,
+    counter,
+    make_product,
+    account_customer,
+):
+    customer, _ = account_customer(300)
+    out = _create(
+        manager_principal,
+        _checkout(
+            counter,
+            [make_product(price="500")],
+            customer=customer,
+            points=100,
+        ),
+    )
+    with SessionLocal() as db, pytest.raises(IntegrityError, match="append-only"):
+        db.execute(
+            update(LoyaltyTransaction)
+            .where(LoyaltyTransaction.invoice_id == out.id)
+            .values(note="attempted rewrite")
+        )

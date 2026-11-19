@@ -80,6 +80,9 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     pack_size: Mapped[str | None] = mapped_column(String(64))
     is_medicine: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    loyalty_eligible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
     tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="0")
     low_stock_threshold: Mapped[Decimal] = mapped_column(
         QUANTITY, nullable=False, server_default="10"

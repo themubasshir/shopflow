@@ -30,6 +30,7 @@ class SalesPoint(BaseModel):
 class LoyaltyAccountOut(BaseModel):
     customer_id: UUID
     customer_name: str
+    customer_name_bn: str | None = None
     phone: str | None
     points_balance: int
     lifetime_earned: int

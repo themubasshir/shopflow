@@ -1,151 +1,70 @@
-"""Transaction-safe invoice finalization (Phase 2A).
-
-Everything in ``finalize_invoice`` runs inside ONE database transaction:
-price resolution, stock locking + deduction, invoice/payment/loyalty writes,
-and the idempotency record. Any failure rolls back every effect.
-"""
+"""Atomic checkout: reserve the request, lock inventory and loyalty, then post the sale."""
 
 from __future__ import annotations
 
-import hashlib
-import json
-import uuid
+from collections import defaultdict
 from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Integer, cast, func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import Principal
-from app.core.errors import (
-    ConflictError,
-    IdempotencyConflictError,
-    InsufficientStockError,
-    NotFoundError,
-    ValidationError,
-)
+from app.api.deps import Principal, assert_counter_allowed
+from app.core.errors import ConflictError, InsufficientStockError, NotFoundError, ValidationError
 from app.models import (
     AuditLog,
     Counter,
-    Customer,
-    IdempotencyRecord,
+    CustomerLedgerEntry,
     Invoice,
     InvoiceCounter,
     InvoiceItem,
-    LoyaltyAccount,
-    LoyaltyRule,
-    LoyaltyTransaction,
     Payment,
     Product,
     StockMovement,
 )
 from app.schemas.sales import InvoiceCreate, InvoiceCreateOut, InvoiceItemOut, PaymentOut
-from app.services.loyalty import LoyaltyPolicy, points_earned
+from app.services.customers import get_customer
+from app.services.idempotency import fingerprint, reserve_request
+from app.services.loyalty_accounts import (
+    award_qualified_points,
+    lock_account,
+    record_redemption,
+    redemption_discount,
+    rule_snapshot,
+)
+from app.services.receivables import OverpaymentError, check_credit_limit
 
 MONEY_Q = Decimal("0.01")
-# Base units that are countable pieces — fractional qty is meaningless.
 _DISCRETE_UNITS = {"piece", "pack", "strip", "box", "bottle", "sachet"}
 
 
 def request_fingerprint(body: InvoiceCreate) -> str:
-    """Stable hash of the validated request payload for idempotency comparison."""
-    canonical = json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode()).hexdigest()
+    payload = body.model_dump(mode="json")
+    # Phase 2A/2B requests had neither field. Preserve their original hashes.
+    if not body.allow_due:
+        payload.pop("allow_due")
+    if not body.redeem_points:
+        payload.pop("redeem_points")
+    return fingerprint(payload)
 
 
-def _existing_idempotent_response(
-    db: Session, shop_id: uuid.UUID, key: str, fingerprint: str
-) -> InvoiceCreateOut | None:
-    record = db.execute(
-        select(IdempotencyRecord)
-        .where(
-            IdempotencyRecord.shop_id == shop_id,
-            IdempotencyRecord.idempotency_key == key,
-        )
-        .with_for_update()
-    ).scalar_one_or_none()
-    if record is None:
-        return None
-    if record.request_fingerprint != fingerprint:
-        raise IdempotencyConflictError(
-            "Idempotency key was already used with a different payload",
-            details={"idempotency_key": key},
-        )
-    if record.response_body:
-        return InvoiceCreateOut.model_validate({**record.response_body, "idempotent_replay": True})
-    return None  # in-flight record without response -> fall through to insert below
-
-
-def _lock_products(
-    db: Session, shop_id: uuid.UUID, product_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, Product]:
-    """Lock product rows in deterministic (sorted id) order to avoid deadlocks.
-
-    Locks via a scalar subquery (`product.id IN (SELECT ... FOR UPDATE)`), which
-    lets us keep `selectinload` for units/category — `joinedload` produces an
-    OUTER JOIN that PostgreSQL rejects alongside `FOR UPDATE`.
-    """
-    locked_ids = (
-        select(Product.id)
+def _lock_products(db: Session, shop_id: UUID, product_ids: list[UUID]) -> dict[UUID, Product]:
+    rows = db.scalars(
+        select(Product)
+        .options(selectinload(Product.units), selectinload(Product.category))
         .where(Product.shop_id == shop_id, Product.id.in_(product_ids))
         .order_by(Product.id)
-        .with_for_update()
-        .scalar_subquery()
-    )
-    rows = (
-        db.execute(
-            select(Product)
-            .options(selectinload(Product.units), selectinload(Product.category))
-            .where(Product.id.in_(locked_ids))
-            .order_by(Product.id)
-        )
-        .scalars()
-        .all()
-    )
-    return {p.id: p for p in rows}
+        .with_for_update(key_share=True)
+    ).all()
+    return {product.id: product for product in rows}
 
 
-def finalize_invoice(
-    db: Session,
-    principal: Principal,
-    body: InvoiceCreate,
-    idempotency_key: str,
-) -> InvoiceCreateOut:
-    shop_id = principal.shop_id
-    fingerprint = request_fingerprint(body)
-
-    # ---- Idempotency: replay or reject before doing any work -------------
-    replay = _existing_idempotent_response(db, shop_id, idempotency_key, fingerprint)
-    if replay is not None:
-        return replay
-
-    # ---- Validate counter & customer against the caller's shop -----------
-    counter = db.execute(
-        select(Counter).where(
-            Counter.id == body.counter_id,
-            Counter.shop_id == shop_id,
-            Counter.is_active.is_(True),
-        )
-    ).scalar_one_or_none()
-    if counter is None:
-        raise NotFoundError("Counter not found", details={"counter_id": str(body.counter_id)})
-
-    customer: Customer | None = None
-    if body.customer_id is not None:
-        customer = db.execute(
-            select(Customer).where(
-                Customer.id == body.customer_id,
-                Customer.shop_id == shop_id,
-                Customer.is_active.is_(True),
-            )
-        ).scalar_one_or_none()
-        if customer is None:
-            raise NotFoundError(
-                "Customer not found", details={"customer_id": str(body.customer_id)}
-            )
-
-    # ---- Lock products (deduplicated, sorted) and validate ----------------
+def _price_items(
+    db: Session, shop_id: UUID, body: InvoiceCreate
+) -> tuple[list[tuple[Product, Decimal, InvoiceItem]], Decimal, Decimal, Decimal]:
     product_ids = sorted({line.product_id for line in body.items})
     products = _lock_products(db, shop_id, product_ids)
     for pid in product_ids:
@@ -154,306 +73,239 @@ def finalize_invoice(
         if not products[pid].is_active:
             raise ValidationError("Product is not sellable", details={"product_id": str(pid)})
 
-    # ---- Merge duplicate lines, price server-side, verify stock ----------
-    # Merge duplicate product+unit lines so stock deduction is exact.
-    merged: dict[tuple[uuid.UUID, uuid.UUID | None], dict] = {}
+    merged = defaultdict(lambda: (Decimal(0), Decimal(0)))
     for line in body.items:
-        k = (line.product_id, line.product_unit_id)
-        m = merged.setdefault(k, {"quantity": Decimal(0), "line_discount": Decimal(0)})
-        m["quantity"] += line.quantity
-        m["line_discount"] += line.line_discount
+        key = (line.product_id, line.product_unit_id)
+        quantity, discount = merged[key]
+        merged[key] = (quantity + line.quantity, discount + line.line_discount)
 
-    items_data: list[dict] = []
-    subtotal = Decimal("0")
-    eligible_total = Decimal("0")
-    for (pid, unit_id), m in merged.items():
+    items = []
+    requested = defaultdict(Decimal)
+    subtotal = line_discounts = eligible_total = Decimal("0.00")
+    for (pid, unit_id), (quantity, discount) in merged.items():
         product = products[pid]
-        quantity = m["quantity"]
-        unit = None
-        if unit_id is not None:
-            unit = next((u for u in product.units if u.id == unit_id), None)
-            if unit is None:
-                raise ValidationError(
-                    "Product unit not found for product",
-                    details={"product_id": str(pid), "product_unit_id": str(unit_id)},
-                )
-        else:
-            unit = next((u for u in product.units if u.is_base), None)
-            if unit is None:
-                raise ValidationError(
-                    "Product has no base selling unit",
-                    details={"product_id": str(pid)},
-                )
-
+        unit = next((u for u in product.units if (u.id == unit_id if unit_id else u.is_base)), None)
+        if unit is None:
+            raise ValidationError(
+                "Product has no matching selling unit", details={"product_id": str(pid)}
+            )
         base_qty = (quantity * unit.conversion_factor).quantize(Decimal("0.001"))
+        if base_qty <= 0:
+            raise ValidationError("Quantity is below the supported stock precision")
         if product.unit in _DISCRETE_UNITS and base_qty != base_qty.to_integral_value():
             raise ValidationError(
-                "Fractional quantity is not allowed for this unit",
-                details={
-                    "product_id": str(pid),
-                    "quantity": str(quantity),
-                    "unit": product.unit,
-                },
+                "Fractional quantity is not allowed for this unit", details={"product_id": str(pid)}
             )
+        requested[pid] += base_qty
 
-        unit_price = unit.selling_price.quantize(MONEY_Q)
-        line_discount = m["line_discount"].quantize(MONEY_Q)
-        line_total = (quantity * unit_price).quantize(MONEY_Q)
-        if line_discount > line_total:
+        raw_total = quantity * unit.selling_price
+        line_total = raw_total.quantize(MONEY_Q)
+        if discount > min(raw_total, line_total):
             raise ValidationError(
-                "Line discount exceeds line total",
-                details={"product_id": str(pid)},
+                "Line discount exceeds line total", details={"product_id": str(pid)}
             )
-        line_total_after = line_total - line_discount
+        net = line_total - discount
+        eligible = (
+            net
+            if product.loyalty_eligible and product.category.loyalty_eligible
+            else Decimal("0.00")
+        )
+        subtotal += line_total
+        line_discounts += discount
+        eligible_total += eligible
+        items.append(
+            (
+                product,
+                base_qty,
+                InvoiceItem(
+                    product_id=pid,
+                    product_unit_id=unit.id,
+                    description=product.name_en,
+                    quantity=quantity,
+                    unit_price=unit.selling_price,
+                    line_discount=discount,
+                    tax_rate=product.tax_rate,
+                    line_total=net,
+                    loyalty_eligible_amount=eligible,
+                ),
+            )
+        )
 
-        if product.stock_on_hand < base_qty:
+    for pid, base_qty in requested.items():
+        available = products[pid].stock_on_hand
+        if available < base_qty:
             raise InsufficientStockError(
                 "Insufficient stock",
                 details={
                     "product_id": str(pid),
                     "requested": str(base_qty),
-                    "available": str(product.stock_on_hand),
+                    "available": str(available),
                 },
             )
+    return items, subtotal, line_discounts, eligible_total
 
-        loyalty_amount = line_total_after if product.category.loyalty_eligible else Decimal("0")
-        eligible_total += loyalty_amount
-        subtotal += line_total
 
-        items_data.append(
-            {
-                "product": product,
-                "unit": unit,
-                "quantity": quantity,
-                "base_qty": base_qty,
-                "unit_price": unit_price,
-                "line_discount": line_discount,
-                "line_total": line_total_after,
-                "loyalty_eligible_amount": loyalty_amount,
-            }
+def _next_invoice_number(db: Session, shop_id: UUID, finalized_at: datetime) -> str:
+    date_key = finalized_at.strftime("%y%m%d")
+    prefix = f"INV-{date_key}-"
+    advance = (
+        update(InvoiceCounter)
+        .where(InvoiceCounter.shop_id == shop_id, InvoiceCounter.counter_date == date_key)
+        .values(last_seq=InvoiceCounter.last_seq + 1)
+        .returning(InvoiceCounter.last_seq)
+    )
+    seq = db.scalar(advance)
+    if seq is None:
+        starting_seq = db.scalar(
+            select(
+                func.coalesce(
+                    func.max(cast(func.substr(Invoice.invoice_number, len(prefix) + 1), Integer)), 0
+                )
+            ).where(Invoice.shop_id == shop_id, Invoice.invoice_number.op("~")(f"^{prefix}[0-9]+$"))
         )
+        db.execute(
+            insert(InvoiceCounter)
+            .values(shop_id=shop_id, counter_date=date_key, last_seq=starting_seq)
+            .on_conflict_do_nothing(index_elements=["shop_id", "counter_date"])
+        )
+        seq = db.scalar(advance)
+    return f"{prefix}{seq:04d}"
 
-    discount_total = body.discount_total.quantize(MONEY_Q)
-    if discount_total > subtotal:
-        raise ValidationError("Invoice discount exceeds subtotal")
-    total = (subtotal - discount_total).quantize(MONEY_Q)
-    if total <= 0:
-        raise ValidationError("Invoice total must be positive")
 
-    # ---- Payments: must exactly cover the total ---------------------------
-    if all(p.amount is None for p in body.payments):
-        if len(body.payments) != 1:
-            raise ValidationError("Split payments require explicit amounts")
-        payment_amounts = [total]
-    else:
-        payment_amounts = [p.amount for p in body.payments]
-        paid_sum = sum(payment_amounts, Decimal("0")).quantize(MONEY_Q)
-        if paid_sum != total:
+def _payment_amounts(body: InvoiceCreate, total: Decimal) -> list[Decimal]:
+    if len(body.payments) == 1 and body.payments[0].amount is None:
+        return [total]
+    if any(payment.amount is None for payment in body.payments):
+        raise ValidationError("Split payments require explicit amounts")
+    amounts = [payment.amount for payment in body.payments]
+    paid = sum(amounts, Decimal("0.00"))
+    if paid > total:
+        raise OverpaymentError("Payments cannot exceed the invoice total")
+    if paid < total and not body.allow_due:
+        raise ValidationError(
+            "Payments must exactly equal the invoice total",
+            details={"total": str(total), "payments": str(paid)},
+        )
+    return amounts
+
+
+def finalize_invoice(
+    db: Session, principal: Principal, body: InvoiceCreate, idempotency_key: str
+) -> InvoiceCreateOut:
+    principal.require_write("sales:write")
+    assert_counter_allowed(principal, body.counter_id)
+    if body.redeem_points:
+        principal.require_write("loyalty:write")
+    try:
+        result = _finalize_invoice(db, principal, body, idempotency_key)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ConflictError("Invoice could not be created (conflict)") from exc
+    except Exception:
+        db.rollback()
+        raise
+    return result
+
+
+def _finalize_invoice(
+    db: Session, principal: Principal, body: InvoiceCreate, key: str
+) -> InvoiceCreateOut:
+    shop_id = principal.shop_id
+    record = reserve_request(db, shop_id, key, request_fingerprint(body))
+    if record.response_body is not None:
+        return InvoiceCreateOut.model_validate({**record.response_body, "idempotent_replay": True})
+
+    counter = db.scalar(
+        select(Counter).where(
+            Counter.id == body.counter_id, Counter.shop_id == shop_id, Counter.is_active.is_(True)
+        )
+    )
+    if counter is None:
+        raise NotFoundError("Counter not found", details={"counter_id": str(body.counter_id)})
+    customer = None
+    if body.customer_id is not None:
+        customer = get_customer(db, shop_id, body.customer_id, lock=True)
+        if not customer.is_active:
+            raise NotFoundError("Active customer not found")
+
+    items, subtotal, line_discounts, eligible = _price_items(db, shop_id, body)
+    manual_discount = body.discount_total.quantize(MONEY_Q)
+    discount_total = line_discounts + manual_discount
+    before_loyalty = subtotal - discount_total
+    if before_loyalty <= 0:
+        raise ValidationError("Invoice total before loyalty must be positive")
+    # Apply invoice-level discounts to eligible spend first, as in Phase 2A.
+    eligible = max(eligible - manual_discount, Decimal("0.00"))
+
+    account = lock_account(db, customer, create=True) if customer else None
+    discount = redemption_discount(account, body.redeem_points, eligible)
+    total = before_loyalty - discount
+    amounts = _payment_amounts(body, total)
+    paid = sum(amounts, Decimal("0.00"))
+    due = total - paid
+    if due:
+        if customer is None or not customer.phone:
             raise ValidationError(
-                "Payments must exactly equal the invoice total",
-                details={"total": str(total), "payments": str(paid_sum)},
+                "A registered customer with a mobile number is required for credit sales"
             )
+        check_credit_limit(db, customer, due)
 
-    # ---- Apply stock deduction (rows already locked) ----------------------
+    finalized_at = datetime.now(UTC)
     invoice = Invoice(
         shop_id=shop_id,
         counter_id=counter.id,
-        customer_id=customer.id if customer else None,
-        invoice_number="",
+        customer_id=body.customer_id,
+        invoice_number=_next_invoice_number(db, shop_id, finalized_at),
         status="finalized",
         subtotal=subtotal,
         discount_total=discount_total,
-        loyalty_discount=Decimal("0"),
-        tax_total=Decimal("0"),
+        loyalty_discount=discount,
+        tax_total=Decimal("0.00"),
         total=total,
-        paid_total=total,
-        due_total=Decimal("0"),
+        paid_total=paid,
+        due_total=due,
         loyalty_points_earned=0,
-        loyalty_points_redeemed=0,
-        idempotency_key=idempotency_key,
+        loyalty_points_redeemed=body.redeem_points,
+        loyalty_rule_snapshot=rule_snapshot(db, shop_id) if account else None,
+        loyalty_earn_base=eligible - discount if account else None,
+        idempotency_key=key,
         created_by=principal.user_id,
-        finalized_at=datetime.now(UTC),
+        finalized_at=finalized_at,
+        items=[item for _, _, item in items],
+        payments=[
+            Payment(
+                method=p.method,
+                amount=amount,
+                reference=p.reference,
+                received_by=principal.user_id,
+                paid_at=finalized_at,
+            )
+            for p, amount in zip(body.payments, amounts, strict=True)
+            if amount
+        ],
     )
     db.add(invoice)
-    db.flush()  # get invoice.id
-
-    # Concurrency-safe daily sequence: lock the per-(shop,date) counter row.
-    date_key = datetime.now(UTC).strftime("%y%m%d")
-    counter_row = db.execute(
-        select(InvoiceCounter)
-        .where(
-            InvoiceCounter.shop_id == shop_id,
-            InvoiceCounter.counter_date == date_key,
-        )
-        .with_for_update()
-    ).scalar_one_or_none()
-    if counter_row is None:
-        # Seed the sequence from today's highest existing suffix so pre-existing
-        # (e.g. seeded) invoice numbers never collide with new ones.
-        prefix = f"INV-{date_key}-"
-        max_existing = db.scalar(
-            select(func.max(Invoice.invoice_number)).where(
-                Invoice.shop_id == shop_id,
-                Invoice.invoice_number.like(f"{prefix}%"),
-            )
-        )
-        start = int(max_existing.rsplit("-", 1)[1]) if max_existing else 0
-        counter_row = InvoiceCounter(shop_id=shop_id, counter_date=date_key, last_seq=start)
-        db.add(counter_row)
-        db.flush()
-        # Re-read under lock so a concurrent insert serialized on the PK.
-        counter_row = db.execute(
-            select(InvoiceCounter)
-            .where(
-                InvoiceCounter.shop_id == shop_id,
-                InvoiceCounter.counter_date == date_key,
-            )
-            .with_for_update()
-        ).scalar_one()
-    counter_row.last_seq += 1
-    invoice.invoice_number = f"INV-{date_key}-{counter_row.last_seq:04d}"
-
-    for d in items_data:
-        product = d["product"]
-        db.add(
-            InvoiceItem(
-                invoice_id=invoice.id,
-                product_id=product.id,
-                product_unit_id=d["unit"].id,
-                description=product.name_en,
-                quantity=d["quantity"],
-                unit_price=d["unit_price"],
-                line_discount=d["line_discount"],
-                tax_rate=product.tax_rate,
-                line_total=d["line_total"],
-                loyalty_eligible_amount=d["loyalty_eligible_amount"],
-            )
-        )
-        product.stock_on_hand -= d["base_qty"]  # locked row; CHECK >= 0 backstops
+    db.flush()
+    for product, base_qty, _ in items:
+        product.stock_on_hand -= base_qty
         db.add(
             StockMovement(
                 shop_id=shop_id,
                 product_id=product.id,
                 counter_id=counter.id,
                 movement_type="sale",
-                quantity=-d["base_qty"],
+                quantity=-base_qty,
                 reference_type="invoice",
                 reference_id=invoice.id,
                 created_by=principal.user_id,
             )
         )
-
-    for payment, amount in zip(body.payments, payment_amounts, strict=True):
-        db.add(
-            Payment(
-                invoice_id=invoice.id,
-                method=payment.method,
-                amount=amount,
-                reference=payment.reference,
-                received_by=principal.user_id,
-            )
-        )
-
-    # ---- Loyalty earn (only when a loyalty account exists) ----------------
-    points = 0
-    account: LoyaltyAccount | None = None
-    if customer is not None:
-        account = db.execute(
-            select(LoyaltyAccount)
-            .where(
-                LoyaltyAccount.customer_id == customer.id,
-                LoyaltyAccount.is_active.is_(True),
-            )
-            .with_for_update()
-        ).scalar_one_or_none()
-    if account is not None:
-        rule = db.scalar(
-            select(LoyaltyRule).where(
-                LoyaltyRule.shop_id == shop_id, LoyaltyRule.is_active.is_(True)
-            )
-        )
-        policy = (
-            LoyaltyPolicy(
-                points_per_100_bdt=rule.points_per_100_bdt,
-                min_redeem_balance=rule.min_redeem_balance,
-                redeem_step_points=rule.redeem_step_points,
-                point_value_bdt=rule.point_value_bdt,
-            )
-            if rule
-            else LoyaltyPolicy()
-        )
-        eligible_after_discount = (
-            eligible_total - discount_total
-            if rule is None or rule.earn_on_eligible_category_only
-            else subtotal - discount_total
-        )
-        eligible_after_discount = max(eligible_after_discount, Decimal("0"))
-        points = points_earned(eligible_after_discount, policy)
-        if points > 0:
-            account.points_balance += points
-            account.lifetime_earned += points
-            db.add(
-                LoyaltyTransaction(
-                    account_id=account.id,
-                    invoice_id=invoice.id,
-                    transaction_type="earn",
-                    points=points,
-                    balance_after=account.points_balance,
-                    created_by=principal.user_id,
-                )
-            )
-        invoice.loyalty_points_earned = points
-
-    out = InvoiceCreateOut(
-        id=invoice.id,
-        invoice_number=invoice.invoice_number,
-        status=invoice.status,
-        counter_code=counter.code,
-        customer_name=customer.name if customer else None,
-        subtotal=subtotal,
-        discount_total=discount_total,
-        tax_total=Decimal("0"),
-        total=total,
-        paid_total=total,
-        due_total=Decimal("0"),
-        loyalty_points_earned=points,
-        loyalty_points_balance=account.points_balance if account else None,
-        finalized_at=invoice.finalized_at,
-        items=[
-            InvoiceItemOut(
-                id=uuid.uuid4(),  # placeholder id; replaced after flush below
-                product_id=d["product"].id,
-                description=d["product"].name_en,
-                quantity=d["quantity"],
-                unit_price=d["unit_price"],
-                line_discount=d["line_discount"],
-                line_total=d["line_total"],
-            )
-            for d in items_data
-        ],
-        payments=[
-            PaymentOut(
-                id=uuid.uuid4(),
-                method=p.method,
-                amount=a,
-                reference=p.reference,
-                paid_at=invoice.finalized_at,
-            )
-            for p, a in zip(body.payments, payment_amounts, strict=True)
-        ],
-        idempotent_replay=False,
-    )
-
-    # Persist the replay payload inside the SAME transaction.
-    db.add(
-        IdempotencyRecord(
-            shop_id=shop_id,
-            idempotency_key=idempotency_key,
-            request_fingerprint=fingerprint,
-            response_status=201,
-            response_body=out.model_dump(mode="json"),
-        )
-    )
+    if account and body.redeem_points:
+        record_redemption(db, account, invoice, principal.user_id)
+    points = award_qualified_points(db, account, invoice, principal.user_id)
+    if due:
+        db.add(CustomerLedgerEntry(customer_id=customer.id, invoice_id=invoice.id, amount=due))
     db.add(
         AuditLog(
             shop_id=shop_id,
@@ -461,45 +313,29 @@ def finalize_invoice(
             action="invoice.finalize",
             entity_type="invoice",
             entity_id=invoice.id,
-            after={"invoice_number": invoice.invoice_number, "total": str(total)},
+            after={"invoice_number": invoice.invoice_number, "total": str(total), "due": str(due)},
         )
     )
-
-    try:
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        raise ConflictError("Invoice could not be created (conflict)", details={}) from exc
-
-    # Replace placeholder item/payment ids with real persisted ids.
-    db.refresh(invoice)
-    out.items = [
-        InvoiceItemOut(
-            id=i.id,
-            product_id=i.product_id,
-            description=i.description,
-            quantity=i.quantity,
-            unit_price=i.unit_price,
-            line_discount=i.line_discount,
-            line_total=i.line_total,
-        )
-        for i in invoice.items
-    ]
-    out.payments = [
-        PaymentOut(
-            id=p.id, method=p.method, amount=p.amount, reference=p.reference, paid_at=p.paid_at
-        )
-        for p in invoice.payments
-    ]
-    # Store the final response (with real ids) as the replay payload.
-    record = db.execute(
-        select(IdempotencyRecord).where(
-            IdempotencyRecord.shop_id == shop_id,
-            IdempotencyRecord.idempotency_key == idempotency_key,
-        )
-    ).scalar_one_or_none()
-    if record is not None:
-        record.response_body = out.model_dump(mode="json")
-        db.commit()
-
-    return out
+    result = InvoiceCreateOut(
+        id=invoice.id,
+        invoice_number=invoice.invoice_number,
+        status=invoice.status,
+        counter_code=counter.code,
+        customer_name=customer.name if customer else None,
+        subtotal=subtotal,
+        discount_total=discount_total,
+        loyalty_discount=discount,
+        tax_total=invoice.tax_total,
+        total=total,
+        paid_total=paid,
+        due_total=due,
+        loyalty_points_earned=points,
+        loyalty_points_redeemed=body.redeem_points,
+        loyalty_points_balance=account.points_balance if account else None,
+        finalized_at=finalized_at,
+        items=[InvoiceItemOut.model_validate(item) for item in invoice.items],
+        payments=[PaymentOut.model_validate(payment) for payment in invoice.payments],
+    )
+    record.response_status = 201
+    record.response_body = result.model_dump(mode="json")
+    return result

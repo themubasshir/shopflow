@@ -6,10 +6,12 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Identity,
     Index,
     Integer,
     String,
@@ -73,6 +75,7 @@ class LoyaltyTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     invoice_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("invoices.id", ondelete="SET NULL")
     )
+    ledger_sequence: Mapped[int] = mapped_column(BigInteger, Identity())
     transaction_type: Mapped[str] = mapped_column(String(16), nullable=False)
     points: Mapped[int] = mapped_column(
         Integer, nullable=False, comment="Signed points; positive earn, negative redeem/reverse."
@@ -93,8 +96,8 @@ class LoyaltyTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="type_valid",
         ),
         CheckConstraint(
-            "(transaction_type IN ('earn','redeem') AND points > 0) OR "
-            "(transaction_type IN ('reverse','expire') AND points < 0) OR "
+            "(transaction_type = 'earn' AND points > 0) OR "
+            "(transaction_type IN ('redeem','reverse','expire') AND points < 0) OR "
             "transaction_type = 'adjust'",
             name="signed_points_match_type",
         ),

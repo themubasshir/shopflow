@@ -1,4 +1,4 @@
-# ShopFlow permission matrix (Phase 2B)
+# ShopFlow permission matrix
 
 Single source of truth: `apps/api/app/core/permissions.py`. Tests in
 `tests/test_rbac.py` assert these boundaries over real HTTP.
@@ -33,6 +33,14 @@ Enforcement is server-side:
 * `POST /invoices` → `assert_counter_allowed` rejects a `counter_id` the caller
   is not assigned to (403), independent of anything the client sends.
 * `GET /invoices` → restricted callers see only their own counters' history.
+
+## Customer accounts (Phase 2C)
+
+- Owners and managers can create, edit, deactivate and reactivate customers with `customers:write`.
+- Checkout requires `sales:write` and an allowed counter. Redemption additionally requires `loyalty:write`.
+- Cashiers can look up names, phone numbers and available points. Account statements, aggregate balances, credit limits, and detailed customer histories require `reports:read`, unrestricted counter access and the applicable customer, sales or loyalty read permission.
+- Due collection additionally requires `sales:write`. Inactive customers can settle existing dues.
+- Customer and invoice data endpoints require a live staff session.
 
 ## Session lifecycle
 

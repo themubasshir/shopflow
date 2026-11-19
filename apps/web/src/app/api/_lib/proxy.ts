@@ -30,11 +30,12 @@ export async function apiProxy(
     },
     cache: "no-store",
   });
-  const body = await res.arrayBuffer();
+  const body = res.status === 204 ? null : await res.arrayBuffer();
   return new NextResponse(body, {
     status: res.status,
     headers: {
       "Content-Type": res.headers.get("content-type") ?? "application/json",
+      "Cache-Control": "no-store",
     },
   });
 }

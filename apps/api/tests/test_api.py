@@ -1,14 +1,11 @@
-"""API integration tests against the seeded development database.
-
-These run against `shopflow_dev`; the test settings point at the same URL the
-app uses, so they require the migration + seed to have been applied.
-"""
+"""API integration tests against the isolated, seeded shopflow_test database."""
 
 from __future__ import annotations
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core.config import settings
 from app.main import app
 
 
@@ -28,7 +25,8 @@ async def test_health(client):
 
 
 @pytest.mark.anyio
-async def test_dashboard_shape(client):
+async def test_dashboard_shape(client, monkeypatch):
+    monkeypatch.setattr(settings, "demo_mode", True)
     r = await client.get("/api/v1/reports/dashboard")
     assert r.status_code in {200, 503}  # 503 if seed has not run yet
     if r.status_code == 200:
@@ -46,7 +44,8 @@ async def test_dashboard_shape(client):
 
 
 @pytest.mark.anyio
-async def test_products_paginated(client):
+async def test_products_paginated(client, monkeypatch):
+    monkeypatch.setattr(settings, "demo_mode", True)
     r = await client.get("/api/v1/catalog/products?limit=5")
     assert r.status_code in {200, 503}
     if r.status_code == 200:

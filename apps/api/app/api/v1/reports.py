@@ -15,7 +15,6 @@ from app.models import (
     Payment,
     Product,
     Shop,
-    User,
 )
 from app.models.catalog import Category
 from app.schemas.catalog import ExpiryAlert, LowStockAlert
@@ -124,12 +123,16 @@ def dashboard(
         for r in series_rows
     ]
 
+    primary_payment = (
+        select(Payment.method)
+        .where(Payment.invoice_id == Invoice.id, Payment.method != "due")
+        .order_by(Payment.amount.desc(), Payment.paid_at, Payment.id)
+        .limit(1)
+        .scalar_subquery()
+    )
     recent_rows = db.execute(
-        select(Invoice, Payment.method, Counter.code, User.name, Shop.is_demo)
+        select(Invoice, primary_payment, Counter.code)
         .join(Counter, Invoice.counter_id == Counter.id)
-        .outerjoin(Payment, Payment.invoice_id == Invoice.id)
-        .outerjoin(User, Invoice.created_by == User.id)
-        .join(Shop, Invoice.shop_id == Shop.id)
         .where(Invoice.shop_id == shop_id)
         .order_by(Invoice.created_at.desc())
         .limit(6)
@@ -141,11 +144,11 @@ def dashboard(
             counter_code=code,
             customer_name=None,
             total=i.total,
-            method=method,
+            method=method or ("due" if i.due_total > 0 else None),
             finalized_at=i.finalized_at,
             status=i.status,
         )
-        for i, method, code, _name, _demo in recent_rows
+        for i, method, code in recent_rows
     ]
 
     is_demo = bool(db.scalar(select(Shop.is_demo).where(Shop.id == shop_id)))

@@ -14,7 +14,8 @@ shops ─┬─ counters (3 billing counters)
        │                        └─ medicine_batches ─┐
        │                                             ├─ batch/expiry/FEFO
        ├─ suppliers ── purchases ── purchase_items ──┘
-       ├─ customers ─── loyalty_accounts ─┬─ loyalty_transactions
+       ├─ customers ─── customer_ledger_entries ── invoices and due payments
+       │             └─ loyalty_accounts ─┬─ loyalty_transactions
        │                                 └─ loyalty_redemptions ── invoice
        ├─ loyalty_rules (1 active per shop)
        ├─ invoices ─── invoice_items ─┬─ payments (cash/bkash/nagad/card/due)
@@ -56,14 +57,13 @@ shops ─┬─ counters (3 billing counters)
 earn  = floor(eligible_amount / 100) points          (category-gated)
 unlock: points_balance >= 300
 redeem: multiples of 100 pts, 100 pts = BDT 100 off,
-        capped by min(balance, floor(total / 100) * 100)
+        capped by min(balance, floor(eligible_net / 100) * 100)
         → never exceeds the invoice total
-no same-invoice earn-and-spend, no expiry in v1,
-returns write a negative `reverse` transaction.
+no same-invoice earn-and-spend and no expiry in v1.
+A future returns workflow will use negative reversal entries.
 ```
 
-Phase 2A implements only the **earn** half of this rule on a real bill; the
-unlock/redeem legs stay in `services/loyalty.py` for the redemption phase.
+Phase 2C records redemption at checkout and earns on fully settled eligible net spend. The invoice stores the rule snapshot and eligible net amount. See [Phase 2C](PHASE-2C.md) for the receivables migration, legacy data handling and posting rules.
 
 ## Invoice numbering
 

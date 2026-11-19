@@ -6,10 +6,12 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Identity,
     Index,
     Integer,
     Numeric,
@@ -18,7 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -36,6 +38,7 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
+    name_bn: Mapped[str | None] = mapped_column(String(160))
     phone: Mapped[str | None] = mapped_column(String(32))
     email: Mapped[str | None] = mapped_column(String(255))
     address: Mapped[str | None] = mapped_column(Text)
@@ -82,6 +85,8 @@ class Invoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     loyalty_points_redeemed: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
     )
+    loyalty_rule_snapshot: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    loyalty_earn_base: Mapped[Decimal | None] = mapped_column(MONEY)
     idempotency_key: Mapped[str | None] = mapped_column(String(120))
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
@@ -110,7 +115,14 @@ class Invoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "loyalty_points_earned >= 0 AND loyalty_points_redeemed >= 0",
             name="loyalty_points_non_negative",
         ),
-        CheckConstraint("loyalty_discount <= total", name="loyalty_discount_within_total"),
+        CheckConstraint(
+            "loyalty_discount <= subtotal - discount_total + tax_total",
+            name="loyalty_discount_within_total",
+        ),
+        CheckConstraint(
+            "status <> 'finalized' OR paid_total + due_total = total",
+            name="finalized_payment_totals",
+        ),
         Index("ix_invoices_shop_id_status_finalized_at", "shop_id", "status", "finalized_at"),
         Index("ix_invoices_counter_id_finalized_at", "counter_id", "finalized_at"),
         Index("ix_invoices_customer_id", "customer_id"),
@@ -184,4 +196,33 @@ class Payment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("method IN ('cash','bkash','nagad','card','due')", name="method_valid"),
         Index("ix_payments_invoice_id", "invoice_id"),
         Index("ix_payments_method_paid_at", "method", "paid_at"),
+    )
+
+
+class CustomerLedgerEntry(Base):
+    """A positive unpaid sale or a negative payment allocated to that invoice."""
+
+    __tablename__ = "customer_ledger_entries"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    customer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("customers.id"), nullable=False)
+    invoice_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("invoices.id"), nullable=False)
+    payment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("payments.id"), unique=True)
+    amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(payment_id IS NULL AND amount > 0) OR (payment_id IS NOT NULL AND amount < 0)",
+            name="amount_matches_type",
+        ),
+        Index("ix_customer_ledger_entries_customer_id_id", "customer_id", "id"),
+        Index(
+            "uq_customer_ledger_entries_invoice_charge",
+            "invoice_id",
+            unique=True,
+            postgresql_where=text("payment_id IS NULL"),
+        ),
     )

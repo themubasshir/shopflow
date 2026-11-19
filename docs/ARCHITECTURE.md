@@ -13,7 +13,7 @@ app/
   db/        engine, session, Base + naming conventions
   models/    SQLAlchemy 2 models grouped by domain (shop/catalog/inventory/sales/loyalty/audit)
   schemas/   Pydantic request/response models
-  services/  pure business rules + the billing transaction (loyalty, billing)
+  services/  pricing, customer accounts, billing, loyalty and receivables
   api/       deps (auth principal) + v1 routers
 ```
 
@@ -47,8 +47,8 @@ billing-client.tsx (client component)
 `deps.get_principal` returns a `Principal`:
 
 * **Demo mode** (no `Authorization` header, `settings.demo_mode` on): the
-  seeded manager on the seeded shop — read APIs only. Flipping `demo_mode`
-  off makes every read require a token.
+  seeded manager’s read permissions on a demo shop. Demo access is opt-in in
+  development and test. Customer and invoice APIs require a live session.
 * **JWT mode**: `POST /auth/login` verifies argon2 hash and returns an
   HS256 token carrying `sub`, `shop_id`, `role`, `permissions[]`, `jti`.
 
@@ -87,48 +87,21 @@ fallback and re-verifies the user is active and the session is live. The web
 app stores the token in an httpOnly, same-site cookie (`shopflow_token`) via
 `POST /api/auth`; server components read it with `lib/session.ts`, and
 writes go through `app/api/*` route handlers that attach `Authorization`
-upstream.
+upstream. Next.js checks the public site Origin before browser API writes.
 
-## Billing transaction (Phase 2A)
+## Billing and collections (Phase 2C)
 
 `POST /invoices` → `app/services/billing.finalize_invoice` runs one atomic
 transaction. Either everything below commits, or nothing does:
 
-1. **Idempotency** — the `Idempotency-Key` header plus a request hash is stored
-   in `idempotency_records`. Replaying the same key with the same payload returns
-   the original invoice (200, `idempotent_replay: true`); the same key with a
-   different payload is a 409 `idempotency_conflict`.
-2. **Lock products in a deterministic order** — `SELECT product.id ... FOR UPDATE`
-   ordered by id, so two concurrent bills touching the same products can never
-   deadlock and stock can't be oversold.
-3. **Price server-side** — line totals and invoice totals are computed from DB
-   prices with `Decimal`. Client-supplied prices are never trusted.
-4. **Allocate the invoice number** — `invoice_counters` (`shop_id`,
-   `counter_date` YYMMDD, `last_seq`) is locked `FOR UPDATE` and incremented,
-   producing `INV-YYMMDD-NNNN` with no gaps or duplicates.
-5. **Deduct stock, write `stock_movements`, payments, loyalty earn** — customers
-   earn `floor(eligible_amount / 100)` points once, after finalize; no redemption
-   in Phase 2A.
+1. Reserve the shop-local idempotency key before taking business locks. Save the response inside the transaction.
+2. Lock the customer, product rows in ascending ID order, and loyalty account. Calculate prices and discounts from database values and validate stock and points.
+3. Allocate the daily invoice number and post the invoice, tender, stock movements, redemption and any unpaid amount.
+4. Credit the award when the invoice is fully settled. Outstanding invoices keep a snapshot of the applicable policy and eligible net spend.
 
-`InsufficientStockError` (409 `insufficient_stock`) carries the requested and
-available quantity in `details`; it is raised before any write, so a rejected
-bill leaves stock, counters and loyalty untouched.
+Collections reserve the key, then lock the customer, invoice and loyalty account. The transaction posts a payment and an immutable ledger credit. Full settlement can award the original sale's points once.
 
-## Money & loyalty rules
-
-* All money is `NUMERIC(14,2)`; quantities `NUMERIC(12,3)`; points are `INTEGER`.
-* No floats anywhere in financial math (backend `Decimal`, frontend formats the string).
-* Loyalty rules are a pure, unit-tested `LoyaltyPolicy` in
-  `app/services/loyalty.py`:
-  - 1 point per full BDT 100 of *eligible* spend (`category.loyalty_eligible`)
-  - unlock at 300 pts, redeem in multiples of 100, 100 pts = BDT 100
-  - same-invoice earn/redeem impossible (earn happens after finalize)
-  - returns reverse earned points
-* DB-side enforcement: CHECK constraints on `loyalty_accounts`
-  (`lifetime_earned - lifetime_redeemed = points_balance`),
-  `loyalty_redemptions` (points % 100 = 0), unique `invoice_id` on
-  redemptions, and a partial unique index guaranteeing one active
-  `loyalty_rules` row per shop.
+Money uses PostgreSQL `NUMERIC(14,2)` and Python `Decimal`. See [Phase 2C](PHASE-2C.md) for rules, permissions, and the full lock order.
 
 ## i18n
 

@@ -13,29 +13,36 @@ from collections.abc import Generator
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-# A dedicated database. The name is asserted below so a stray environment
-# cannot silently redirect the suite at shopflow_dev / production.
-TEST_DATABASE_URL = os.environ.get(
-    "SHOPFLOW_TEST_DATABASE_URL",
-    "postgresql+psycopg://shopflow_app:yXhH5B43O0hNgHlYZACAj1lIF6vyhM1D@localhost:5432/shopflow_test",
-)
+from app.core.config import settings
 
 
-def _assert_is_test_db(url: str) -> None:
-    if "shopflow_test" not in url:
+def _test_database_url() -> str:
+    configured = os.getenv("SHOPFLOW_TEST_DATABASE_URL")
+    if configured:
+        url = make_url(configured)
+    else:
+        local = make_url(settings.database_url)
+        if local.host not in {"localhost", "127.0.0.1", "::1"} or local.database not in {
+            "shopflow_dev",
+            "shopflow_test",
+        }:
+            raise RuntimeError(
+                "Set SHOPFLOW_TEST_DATABASE_URL to a dedicated shopflow_test database."
+            )
+        url = local.set(database="shopflow_test")
+    if url.get_backend_name() != "postgresql" or url.database != "shopflow_test":
+        raise RuntimeError("Tests require a PostgreSQL database named exactly shopflow_test.")
+    if {"dbname", "database", "service", "servicefile"} & url.query.keys():
         raise RuntimeError(
-            f"Refusing to run tests against a non-test database: {url!r}. "
-            "Set SHOPFLOW_TEST_DATABASE_URL to the dedicated test DB."
+            "Test database URL cannot override the target database via query parameters."
         )
-    forbidden = ("shopflow_dev", "shopflow_prod", "production")
-    for bad in forbidden:
-        if bad in url:
-            raise RuntimeError(f"Test database URL must not target {bad!r}: {url!r}")
+    return url.render_as_string(hide_password=False)
 
 
-_assert_is_test_db(TEST_DATABASE_URL)
+TEST_DATABASE_URL = _test_database_url()
 
 # Build an isolated engine/sessionmaker bound only to the test database and
 # swap it into app.db.session BEFORE the app is imported by the tests.
@@ -86,6 +93,8 @@ def _prepare_test_database():
     """Apply the seed exactly once per test run, against shopflow_test only."""
     with test_engine.connect() as conn:
         # Touch a known table to surface "database not migrated" early.
+        if conn.scalar(text("SELECT current_database()")) != "shopflow_test":
+            raise RuntimeError("Refusing to use a connection outside shopflow_test.")
         conn.execute(text("SELECT 1 FROM shops LIMIT 1"))
     _seed_once()
     yield

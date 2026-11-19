@@ -1,3 +1,5 @@
+import type { components } from "../../../../packages/contracts/api.generated";
+
 /** Mirrors apps/api schemas for Phase 1; generated contract types land in packages/contracts. */
 
 export interface Paginated<T> {
@@ -104,19 +106,12 @@ export interface ProductOut {
   loyalty_eligible: boolean;
 }
 
-export interface CustomerOut {
-  id: string;
-  name: string;
-  phone: string | null;
-  email: string | null;
-  credit_limit: string;
-  points_balance: number;
-  is_active: boolean;
-}
+export type CustomerOut = components["schemas"]["CustomerOut"];
 
 export interface LoyaltyAccountOut {
   customer_id: string;
   customer_name: string;
+  customer_name_bn?: string | null;
   phone: string | null;
   points_balance: number;
   lifetime_earned: number;
@@ -134,24 +129,7 @@ export interface InvoiceItemOut {
   line_total: string;
 }
 
-export interface InvoiceOut {
-  id: string;
-  invoice_number: string;
-  counter_code: string | null;
-  customer_name: string | null;
-  status: string;
-  subtotal: string;
-  discount_total: string;
-  loyalty_discount: string;
-  tax_total: string;
-  total: string;
-  paid_total: string;
-  due_total: string;
-  finalized_at: string | null;
-  created_at: string;
-  items: InvoiceItemOut[];
-  payment_methods: string[];
-}
+export type InvoiceOut = components["schemas"]["InvoiceOut"];
 
 // ---- Phase 2A: billing write path ------------------------------------------
 
@@ -176,13 +154,7 @@ export interface PaymentCreate {
   reference?: string | null;
 }
 
-export interface InvoiceCreate {
-  counter_id: string;
-  customer_id?: string | null;
-  items: InvoiceItemCreate[];
-  discount_total: string;
-  payments: PaymentCreate[];
-}
+export type InvoiceCreate = components["schemas"]["InvoiceCreate"];
 
 export interface PaymentOut {
   id: string;
@@ -192,25 +164,7 @@ export interface PaymentOut {
   paid_at: string;
 }
 
-export interface InvoiceCreateOut {
-  id: string;
-  invoice_number: string;
-  status: string;
-  counter_code: string;
-  customer_name: string | null;
-  subtotal: string;
-  discount_total: string;
-  tax_total: string;
-  total: string;
-  paid_total: string;
-  due_total: string;
-  loyalty_points_earned: number;
-  loyalty_points_balance: number | null;
-  finalized_at: string | null;
-  items: InvoiceItemOut[];
-  payments: PaymentOut[];
-  idempotent_replay: boolean;
-}
+export type InvoiceCreateOut = components["schemas"]["InvoiceCreateOut"];
 
 // ---- Phase 2B: employees & counter management -------------------------------
 
@@ -264,3 +218,13 @@ export interface CounterStaffOut {
   email: string;
   is_active: boolean;
 }
+
+export type CustomerCreate = components["schemas"]["CustomerCreate"];
+export type CustomerUpdate = components["schemas"]["CustomerUpdate"];
+export type CustomerLoyaltyOut = components["schemas"]["CustomerLoyaltyOut"];
+export type LoyaltyEntryOut = components["schemas"]["LoyaltyEntryOut"];
+export type CustomerPaymentOut = components["schemas"]["CustomerPaymentOut"];
+export type CustomerBalanceOut = components["schemas"]["CustomerBalanceOut"];
+export type CustomerLedgerEntryOut = components["schemas"]["CustomerLedgerEntryOut"];
+export type DuePaymentCreate = components["schemas"]["DuePaymentCreate"];
+export type DuePaymentOut = components["schemas"]["DuePaymentOut"];

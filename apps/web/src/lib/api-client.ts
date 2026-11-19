@@ -44,3 +44,10 @@ export function newIdempotencyKey(): string {
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   return `bill-${hex}`;
 }
+
+export async function browserRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, { ...init, cache: "no-store" });
+  const body = await res.json();
+  if (!res.ok) throw new ApiError(body.error, res.status, body.code, body.details);
+  return body as T;
+}

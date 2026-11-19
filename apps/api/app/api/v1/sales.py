@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import (
     Principal,
-    assert_counter_allowed,
     get_authenticated_principal,
     get_principal,
 )
@@ -15,13 +14,14 @@ from app.models import Counter, Customer, Invoice, LoyaltyAccount
 from app.schemas.common import Paginated
 from app.schemas.reports import LoyaltyAccountOut
 from app.schemas.sales import (
-    CustomerOut,
     InvoiceCreate,
     InvoiceCreateOut,
     InvoiceOut,
 )
 from app.schemas.shop import CounterOut
 from app.services.billing import finalize_invoice
+from app.services.loyalty import can_redeem
+from app.services.loyalty_accounts import POLICY
 
 router = APIRouter(tags=["sales"])
 
@@ -44,68 +44,39 @@ def list_counters(
     ]
 
 
-@router.get("/customers", response_model=Paginated[CustomerOut])
-def list_customers(
-    principal: Principal = Depends(get_principal),
-    db: Session = Depends(get_db),
-    q: str | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-) -> Paginated[CustomerOut]:
-    stmt = (
-        select(Customer, LoyaltyAccount.points_balance)
-        .outerjoin(LoyaltyAccount, LoyaltyAccount.customer_id == Customer.id)
-        .where(Customer.shop_id == principal.shop_id)
-    )
-    if q:
-        stmt = stmt.where((Customer.name.ilike(f"%{q}%")) | (Customer.phone.ilike(f"%{q}%")))
-    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-    rows = db.execute(stmt.order_by(Customer.name).limit(limit).offset(offset)).all()
-    return Paginated(
-        items=[
-            CustomerOut(
-                id=c.id,
-                name=c.name,
-                phone=c.phone,
-                email=c.email,
-                credit_limit=c.credit_limit,
-                points_balance=int(points or 0),
-                is_active=c.is_active,
-            )
-            for c, points in rows
-        ],
-        total=total,
-        limit=limit,
-        offset=offset,
-    )
-
-
 @router.get("/loyalty/accounts", response_model=Paginated[LoyaltyAccountOut])
 def list_loyalty_accounts(
-    principal: Principal = Depends(get_principal),
+    principal: Principal = Depends(get_authenticated_principal),
     db: Session = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> Paginated[LoyaltyAccountOut]:
+    principal.require("loyalty:read")
+    can_view_history = (
+        principal.assigned_counter_ids is None and "reports:read" in principal.permissions
+    )
     stmt = (
         select(LoyaltyAccount, Customer)
         .join(Customer, LoyaltyAccount.customer_id == Customer.id)
-        .where(LoyaltyAccount.shop_id == principal.shop_id)
+        .where(LoyaltyAccount.shop_id == principal.shop_id, Customer.shop_id == principal.shop_id)
     )
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.execute(
-        stmt.order_by(LoyaltyAccount.points_balance.desc()).limit(limit).offset(offset)
+        stmt.order_by(LoyaltyAccount.points_balance.desc(), LoyaltyAccount.id)
+        .limit(limit)
+        .offset(offset)
     ).all()
     return Paginated(
         items=[
             LoyaltyAccountOut(
                 customer_id=c.id,
                 customer_name=c.name,
+                customer_name_bn=c.name_bn,
                 phone=c.phone,
                 points_balance=a.points_balance,
-                lifetime_earned=a.lifetime_earned,
-                lifetime_redeemed=a.lifetime_redeemed,
-                can_redeem=a.points_balance >= 300,
+                lifetime_earned=a.lifetime_earned if can_view_history else 0,
+                lifetime_redeemed=a.lifetime_redeemed if can_view_history else 0,
+                can_redeem=c.is_active and a.is_active and can_redeem(a.points_balance, POLICY),
             )
             for a, c in rows
         ],
@@ -122,6 +93,7 @@ def list_invoices(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> Paginated[InvoiceOut]:
+    principal.require("sales:read")
     stmt = (
         select(Invoice, Counter.code)
         .join(Counter, Invoice.counter_id == Counter.id)
@@ -171,6 +143,7 @@ def list_invoices(
     "/invoices",
     response_model=InvoiceCreateOut,
     status_code=status.HTTP_201_CREATED,
+    responses={200: {"model": InvoiceCreateOut, "description": "Idempotent replay"}},
 )
 def create_invoice(
     body: InvoiceCreate,
@@ -182,10 +155,6 @@ def create_invoice(
     """Finalize a bill atomically: stock deduction, payment, loyalty earn and
     the idempotency record all commit — or roll back — together. Cashier
     identity comes from the JWT; counter must belong to the caller's shop."""
-    principal.require("sales:write")
-    # Server-side counter authorization: the client-sent counter id is never
-    # trusted — a cashier can only bill at a counter they are assigned to.
-    assert_counter_allowed(principal, body.counter_id)
     out = finalize_invoice(db, principal, body, idempotency_key)
     if out.idempotent_replay:
         response.status_code = status.HTTP_200_OK

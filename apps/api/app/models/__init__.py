@@ -16,7 +16,7 @@ from app.models.loyalty import (
     LoyaltyRule,
     LoyaltyTransaction,
 )
-from app.models.sales import Customer, Invoice, InvoiceItem, Payment
+from app.models.sales import Customer, CustomerLedgerEntry, Invoice, InvoiceItem, Payment
 from app.models.shop import AuthSession, Counter, Role, Shop, User, UserCounter
 
 __all__ = [
@@ -25,6 +25,7 @@ __all__ = [
     "Category",
     "Counter",
     "Customer",
+    "CustomerLedgerEntry",
     "IdempotencyRecord",
     "Invoice",
     "InvoiceCounter",
