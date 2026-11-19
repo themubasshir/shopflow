@@ -13,6 +13,7 @@ const ITEMS: { key: string; href: string; permission?: string }[] = [
   { key: "dashboard", href: "" },
   { key: "billing", href: "/billing" },
   { key: "inventory", href: "/inventory" },
+  { key: "products", href: "/products", permission: "catalog:write" },
   { key: "customers", href: "/customers" },
   { key: "loyalty", href: "/loyalty" },
   { key: "reports", href: "/reports", permission: "reports:read" },

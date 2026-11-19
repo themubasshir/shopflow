@@ -51,6 +51,10 @@ export const api = {
     );
   },
   categories: () => request<import("@/types").CategoryOut[]>("/catalog/categories"),
+  product: (id: string) =>
+    request<import("@/types").ProductDetailOut>(`/catalog/products/${encodeURIComponent(id)}`),
+  categoriesManage: () =>
+    request<import("@/types").CategoryManageOut[]>("/catalog/categories/manage"),
   counters: () => request<import("@/types").CounterOut[]>("/counters"),
   customers: (query = new URLSearchParams()) =>
     request<import("@/types").Paginated<import("@/types").CustomerOut>>(`/customers?${query}`),

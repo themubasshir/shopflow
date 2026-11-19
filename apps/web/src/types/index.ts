@@ -10,6 +10,22 @@ export type SupplierCreditNote = components["schemas"]["CreditNoteOut"];
 export type FinanceReport = components["schemas"]["FinanceReport"];
 export type Reconciliation = components["schemas"]["ReconciliationOut"];
 
+// ---- Phase 2E-2: catalog management ------------------------------------------
+export type ProductDetailOut = components["schemas"]["ProductDetailOut"];
+export type ProductWrite = components["schemas"]["ProductWrite"];
+export type ProductUpdate = components["schemas"]["ProductUpdate"];
+export type ProductUnitWrite = components["schemas"]["ProductUnitWrite"];
+export type ProductUnitOut = components["schemas"]["ProductUnitOut"];
+export type MedicineWrite = components["schemas"]["MedicineWrite-Input"];
+export type MedicineOut = components["schemas"]["MedicineWrite-Output"];
+export type CategoryWrite = components["schemas"]["CategoryWrite"];
+export type CategoryManageOut = components["schemas"]["CategoryManageOut"];
+export type ImportPreview = components["schemas"]["ImportPreview"];
+export type ImportPreviewRow = components["schemas"]["ImportPreviewRow"];
+export type ImportCommit = components["schemas"]["ImportCommit"];
+export type ImportCommitRow = components["schemas"]["ImportCommitRow"];
+export type ImportReport = components["schemas"]["ImportReport"];
+
 export interface Paginated<T> {
   items: T[];
   total: number;

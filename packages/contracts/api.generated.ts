@@ -123,7 +123,8 @@ export interface paths {
         /** List Categories */
         get: operations["list_categories_api_v1_catalog_categories_get"];
         put?: never;
-        post?: never;
+        /** Create Category */
+        post: operations["create_category_api_v1_catalog_categories_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -140,7 +141,112 @@ export interface paths {
         /** List Products */
         get: operations["list_products_api_v1_catalog_products_get"];
         put?: never;
+        /** Create Product */
+        post: operations["create_product_api_v1_catalog_products_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/products/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Product */
+        get: operations["get_product_api_v1_catalog_products__product_id__get"];
+        /** Update Product */
+        put: operations["update_product_api_v1_catalog_products__product_id__put"];
         post?: never;
+        /** Delete Product */
+        delete: operations["delete_product_api_v1_catalog_products__product_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/products/{product_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set Product State */
+        patch: operations["set_product_state_api_v1_catalog_products__product_id__state_patch"];
+        trace?: never;
+    };
+    "/api/v1/catalog/categories/manage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Categories Manage */
+        get: operations["list_categories_manage_api_v1_catalog_categories_manage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Category */
+        put: operations["update_category_api_v1_catalog_categories__category_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/imports/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Preview */
+        post: operations["import_preview_api_v1_catalog_imports_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/imports/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Commit */
+        post: operations["import_commit_api_v1_catalog_imports_commit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1409,6 +1515,46 @@ export interface components {
             /** Quarantined */
             quarantined: boolean;
         };
+        /** Body_import_preview_api_v1_catalog_imports_preview_post */
+        Body_import_preview_api_v1_catalog_imports_preview_post: {
+            /** File */
+            file: string;
+        };
+        /** CategoryManageOut */
+        CategoryManageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name En */
+            name_en: string;
+            /** Name Bn */
+            name_bn: string;
+            /** Slug */
+            slug: string;
+            /** Is Medicine */
+            is_medicine: boolean;
+            /** Loyalty Eligible */
+            loyalty_eligible: boolean;
+            /**
+             * Product Count
+             * @default 0
+             */
+            product_count: number;
+            /** Parent Id */
+            parent_id?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+        };
         /** CategoryOut */
         CategoryOut: {
             /**
@@ -1431,6 +1577,40 @@ export interface components {
              * @default 0
              */
             product_count: number;
+        };
+        /**
+         * CategoryWrite
+         * @description Create or update a category. ``slug`` is the stable machine identifier.
+         */
+        CategoryWrite: {
+            /** Name En */
+            name_en: string;
+            /** Name Bn */
+            name_bn: string;
+            /** Slug */
+            slug: string;
+            /** Parent Id */
+            parent_id?: string | null;
+            /**
+             * Is Medicine
+             * @default false
+             */
+            is_medicine: boolean;
+            /**
+             * Loyalty Eligible
+             * @default true
+             */
+            loyalty_eligible: boolean;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
         };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
@@ -1472,6 +1652,10 @@ export interface components {
             dots_width: number;
             /** Dpi */
             dpi: number;
+            /** Density */
+            density: number;
+            /** Feed Dots */
+            feed_dots: number;
             /** Paper Width Mm */
             paper_width_mm: number;
             /** Has Cutter */
@@ -2054,6 +2238,161 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * ImportCommit
+         * @description Approved rows from the preview. The server re-validates every row
+         *     against the live catalog at commit time — the preview is advisory only.
+         */
+        ImportCommit: {
+            /** Rows */
+            rows: components["schemas"]["ImportCommitRow"][];
+            /**
+             * Create Missing Categories
+             * @default false
+             */
+            create_missing_categories: boolean;
+        };
+        /**
+         * ImportCommitRow
+         * @description An approved row to insert. ``approved`` rows are inserted; the rest are
+         *     skipped. ``sku`` ties the decision back to the previewed row.
+         */
+        ImportCommitRow: {
+            /** Row */
+            row?: number | null;
+            /** Sku */
+            sku: string;
+            /** Name En */
+            name_en: string;
+            /** Name Bn */
+            name_bn: string;
+            /** Barcode */
+            barcode?: string | null;
+            /** Category Slug */
+            category_slug?: string | null;
+            /**
+             * Unit
+             * @default piece
+             */
+            unit: string;
+            /** Selling Price */
+            selling_price?: number | string | null;
+            /** Search Aliases */
+            search_aliases?: string[];
+            /**
+             * Is Medicine
+             * @default false
+             */
+            is_medicine: boolean;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Generic Name */
+            generic_name?: string | null;
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Strength */
+            strength?: string | null;
+            /** Dosage Form */
+            dosage_form?: string | null;
+            /** Pack Size */
+            pack_size?: string | null;
+            /** Mrp */
+            mrp?: number | string | null;
+            /** Purchase Cost */
+            purchase_cost?: number | string | null;
+            /** Retail Price */
+            retail_price?: number | string | null;
+            /**
+             * Prescription Required
+             * @default false
+             */
+            prescription_required: boolean;
+        };
+        /** ImportPreview */
+        ImportPreview: {
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Filename */
+            filename: string;
+            /** Total Rows */
+            total_rows: number;
+            /** Create Count */
+            create_count: number;
+            /** Duplicate Count */
+            duplicate_count: number;
+            /** Invalid Count */
+            invalid_count: number;
+            /** Rows */
+            rows: components["schemas"]["ImportPreviewRow"][];
+            /**
+             * Categories Created
+             * @default []
+             */
+            categories_created: string[];
+        };
+        /**
+         * ImportPreviewRow
+         * @description One parsed row with its classification and any validation errors.
+         */
+        ImportPreviewRow: {
+            /** Row */
+            row: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "create" | "duplicate" | "invalid";
+            /**
+             * Errors
+             * @default []
+             */
+            errors: components["schemas"]["ImportRowError"][];
+            data?: components["schemas"]["ProductImportRowModel"] | null;
+            /** Duplicate Of */
+            duplicate_of?: string | null;
+        };
+        /** ImportReport */
+        ImportReport: {
+            /** Created */
+            created: number;
+            /** Skipped */
+            skipped: number;
+            /** Errors */
+            errors: number;
+            /** Results */
+            results: components["schemas"]["ImportResultRow"][];
+            /**
+             * Categories Created
+             * @default []
+             */
+            categories_created: string[];
+        };
+        /** ImportResultRow */
+        ImportResultRow: {
+            /** Sku */
+            sku: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "created" | "skipped_duplicate" | "error";
+            /** Detail */
+            detail?: string | null;
+            /** Product Id */
+            product_id?: string | null;
+        };
+        /** ImportRowError */
+        ImportRowError: {
+            /** Row */
+            row: number;
+            /** Field */
+            field?: string | null;
+            /** Message */
+            message: string;
+        };
         /** InvoiceCreate */
         InvoiceCreate: {
             /**
@@ -2418,6 +2757,64 @@ export interface components {
              */
             is_demo: boolean;
         };
+        /**
+         * MedicineWrite
+         * @description Pharmacy catalogue fields kept on ``medicine_details`` (not batches).
+         */
+        "MedicineWrite-Input": {
+            /** Brand Name */
+            brand_name: string;
+            /** Generic Name */
+            generic_name: string;
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Strength */
+            strength?: string | null;
+            /** Dosage Form */
+            dosage_form?: string | null;
+            /** Pack Size */
+            pack_size?: string | null;
+            /** Mrp */
+            mrp?: number | string | null;
+            /** Purchase Cost */
+            purchase_cost?: number | string | null;
+            /** Retail Price */
+            retail_price?: number | string | null;
+            /**
+             * Prescription Required
+             * @default false
+             */
+            prescription_required: boolean;
+        };
+        /**
+         * MedicineWrite
+         * @description Pharmacy catalogue fields kept on ``medicine_details`` (not batches).
+         */
+        "MedicineWrite-Output": {
+            /** Brand Name */
+            brand_name: string;
+            /** Generic Name */
+            generic_name: string;
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Strength */
+            strength?: string | null;
+            /** Dosage Form */
+            dosage_form?: string | null;
+            /** Pack Size */
+            pack_size?: string | null;
+            /** Mrp */
+            mrp?: string | null;
+            /** Purchase Cost */
+            purchase_cost?: string | null;
+            /** Retail Price */
+            retail_price?: string | null;
+            /**
+             * Prescription Required
+             * @default false
+             */
+            prescription_required: boolean;
+        };
         /** MovementOut */
         MovementOut: {
             /**
@@ -2671,6 +3068,26 @@ export interface components {
             /** Reprint Of Job Id */
             reprint_of_job_id: string | null;
         };
+        /**
+         * PrinterCapabilities
+         * @description What the device's firmware can do.
+         *
+         *     Only ``raster`` is implemented: the agent rasterizes the canonical PDF and
+         *     sends ``GS v 0`` bitmaps, so Bengali shaping never depends on printer
+         *     firmware. ``character`` is recorded for inventory purposes but is not used.
+         */
+        PrinterCapabilities: {
+            /**
+             * Raster
+             * @default true
+             */
+            raster: boolean;
+            /**
+             * Character
+             * @default false
+             */
+            character: boolean;
+        };
         /** PrinterCreate */
         PrinterCreate: {
             /** Name */
@@ -2683,6 +3100,8 @@ export interface components {
             transport: "network" | "bluetooth";
             /** Agent Id */
             agent_id: string;
+            /** Device Model */
+            device_model?: string | null;
             /**
              * Paper Width Mm
              * @default 80
@@ -2699,6 +3118,16 @@ export interface components {
              */
             dpi: number;
             /**
+             * Density
+             * @default 4
+             */
+            density: number;
+            /**
+             * Feed Dots
+             * @default 90
+             */
+            feed_dots: number;
+            /**
              * Has Cutter
              * @default true
              */
@@ -2714,6 +3143,13 @@ export interface components {
              * @enum {string}
              */
             default_language: "en" | "bn" | "bilingual";
+            /**
+             * @default {
+             *       "raster": true,
+             *       "character": false
+             *     }
+             */
+            capabilities: components["schemas"]["PrinterCapabilities"];
             /** Config */
             config?: {
                 [key: string]: unknown;
@@ -2732,18 +3168,28 @@ export interface components {
             transport: string;
             /** Agent Id */
             agent_id: string;
+            /** Device Model */
+            device_model?: string | null;
             /** Paper Width Mm */
             paper_width_mm: number;
             /** Dots Width */
             dots_width: number;
             /** Dpi */
             dpi: number;
+            /** Density */
+            density: number;
+            /** Feed Dots */
+            feed_dots: number;
             /** Has Cutter */
             has_cutter: boolean;
             /** Is Enabled */
             is_enabled: boolean;
             /** Default Language */
             default_language: string;
+            /** Capabilities */
+            capabilities?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Counter Ids
              * @default []
@@ -2779,22 +3225,153 @@ export interface components {
             transport?: ("network" | "bluetooth") | null;
             /** Agent Id */
             agent_id?: string | null;
+            /** Device Model */
+            device_model?: string | null;
             /** Paper Width Mm */
             paper_width_mm?: number | null;
             /** Dots Width */
             dots_width?: number | null;
             /** Dpi */
             dpi?: number | null;
+            /** Density */
+            density?: number | null;
+            /** Feed Dots */
+            feed_dots?: number | null;
             /** Has Cutter */
             has_cutter?: boolean | null;
             /** Is Enabled */
             is_enabled?: boolean | null;
             /** Default Language */
             default_language?: ("en" | "bn" | "bilingual") | null;
+            capabilities?: components["schemas"]["PrinterCapabilities"] | null;
             /** Config */
             config?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** ProductDetailOut */
+        ProductDetailOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Sku */
+            sku: string;
+            /** Barcode */
+            barcode: string | null;
+            /** Name En */
+            name_en: string;
+            /** Name Bn */
+            name_bn: string;
+            /** Unit */
+            unit: string;
+            /** Is Medicine */
+            is_medicine: boolean;
+            /** Is Active */
+            is_active: boolean;
+            /** Stock On Hand */
+            stock_on_hand: string;
+            /** Low Stock Threshold */
+            low_stock_threshold: string;
+            /** Price */
+            price?: string | null;
+            /** Category Name En */
+            category_name_en?: string | null;
+            /** Category Name Bn */
+            category_name_bn?: string | null;
+            /**
+             * Loyalty Eligible
+             * @default true
+             */
+            loyalty_eligible: boolean;
+            /** Nearest Expiry */
+            nearest_expiry?: string | null;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /**
+             * Search Aliases
+             * @default []
+             */
+            search_aliases: string[];
+            /** Pack Size */
+            pack_size?: string | null;
+            /**
+             * Tax Rate
+             * @default 0
+             */
+            tax_rate: string;
+            /**
+             * Units
+             * @default []
+             */
+            units: components["schemas"]["ProductUnitOut"][];
+            medicine?: components["schemas"]["MedicineWrite-Output"] | null;
+            /**
+             * Has History
+             * @default false
+             */
+            has_history: boolean;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /**
+         * ProductImportRowModel
+         * @description A single normalized import row (the shape the parser produces).
+         */
+        ProductImportRowModel: {
+            /** Row */
+            row: number;
+            /** Sku */
+            sku: string;
+            /** Name En */
+            name_en: string;
+            /** Name Bn */
+            name_bn: string;
+            /** Barcode */
+            barcode?: string | null;
+            /** Category Slug */
+            category_slug?: string | null;
+            /**
+             * Unit
+             * @default piece
+             */
+            unit: string;
+            /** Selling Price */
+            selling_price?: string | null;
+            /** Search Aliases */
+            search_aliases?: string[];
+            /**
+             * Is Medicine
+             * @default false
+             */
+            is_medicine: boolean;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Generic Name */
+            generic_name?: string | null;
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Strength */
+            strength?: string | null;
+            /** Dosage Form */
+            dosage_form?: string | null;
+            /** Pack Size */
+            pack_size?: string | null;
+            /** Mrp */
+            mrp?: string | null;
+            /** Purchase Cost */
+            purchase_cost?: string | null;
+            /** Retail Price */
+            retail_price?: string | null;
+            /**
+             * Prescription Required
+             * @default false
+             */
+            prescription_required: boolean;
         };
         /** ProductOut */
         ProductOut: {
@@ -2835,6 +3412,11 @@ export interface components {
             /** Nearest Expiry */
             nearest_expiry?: string | null;
         };
+        /** ProductStateWrite */
+        ProductStateWrite: {
+            /** Is Active */
+            is_active: boolean;
+        };
         /** ProductUnitOut */
         ProductUnitOut: {
             /**
@@ -2852,6 +3434,115 @@ export interface components {
             selling_price: string;
             /** Is Base */
             is_base: boolean;
+        };
+        /**
+         * ProductUnitWrite
+         * @description One sellable/ordering unit. Exactly one unit must be ``is_base`` and the
+         *     base unit carries conversion_factor 1.
+         */
+        ProductUnitWrite: {
+            /** Name */
+            name: string;
+            /** Name Bn */
+            name_bn: string;
+            /**
+             * Conversion Factor
+             * @default 1
+             */
+            conversion_factor: number | string;
+            /** Selling Price */
+            selling_price: number | string;
+            /**
+             * Is Base
+             * @default false
+             */
+            is_base: boolean;
+        };
+        /**
+         * ProductUpdate
+         * @description Edit a product's catalogue fields. Never touches ``stock_on_hand`` /
+         *     ``held_quantity`` — those move only through the stock ledger.
+         */
+        ProductUpdate: {
+            /** Category Id */
+            category_id?: string | null;
+            /** Barcode */
+            barcode?: string | null;
+            /** Name En */
+            name_en?: string | null;
+            /** Name Bn */
+            name_bn?: string | null;
+            /** Search Aliases */
+            search_aliases?: string[] | null;
+            /** Unit */
+            unit?: string | null;
+            /** Pack Size */
+            pack_size?: string | null;
+            /** Is Medicine */
+            is_medicine?: boolean | null;
+            /** Loyalty Eligible */
+            loyalty_eligible?: boolean | null;
+            /** Tax Rate */
+            tax_rate?: number | string | null;
+            /** Low Stock Threshold */
+            low_stock_threshold?: number | string | null;
+            /** Units */
+            units?: components["schemas"]["ProductUnitWrite"][] | null;
+            medicine?: components["schemas"]["MedicineWrite-Input"] | null;
+            /** Is Active */
+            is_active?: boolean | null;
+        };
+        /**
+         * ProductWrite
+         * @description Create a product. Stock always starts at zero; physical stock only
+         *     enters through receiving or an audited opening-stock flow.
+         */
+        ProductWrite: {
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /** Sku */
+            sku: string;
+            /** Barcode */
+            barcode?: string | null;
+            /** Name En */
+            name_en: string;
+            /** Name Bn */
+            name_bn: string;
+            /** Search Aliases */
+            search_aliases?: string[];
+            /**
+             * Unit
+             * @default piece
+             */
+            unit: string;
+            /** Pack Size */
+            pack_size?: string | null;
+            /**
+             * Is Medicine
+             * @default false
+             */
+            is_medicine: boolean;
+            /**
+             * Loyalty Eligible
+             * @default true
+             */
+            loyalty_eligible: boolean;
+            /**
+             * Tax Rate
+             * @default 0
+             */
+            tax_rate: number | string;
+            /**
+             * Low Stock Threshold
+             * @default 10
+             */
+            low_stock_threshold: number | string;
+            /** Units */
+            units: components["schemas"]["ProductUnitWrite"][];
+            medicine?: components["schemas"]["MedicineWrite-Input"] | null;
         };
         /** PurchaseCreditsOut */
         PurchaseCreditsOut: {
@@ -3784,6 +4475,39 @@ export interface operations {
             };
         };
     };
+    create_category_api_v1_catalog_categories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryManageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_products_api_v1_catalog_products_get: {
         parameters: {
             query?: {
@@ -3808,6 +4532,290 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Paginated_ProductOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_product_api_v1_catalog_products_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_product_api_v1_catalog_products__product_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_product_api_v1_catalog_products__product_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_product_api_v1_catalog_products__product_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_product_state_api_v1_catalog_products__product_id__state_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductStateWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_categories_manage_api_v1_catalog_categories_manage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryManageOut"][];
+                };
+            };
+        };
+    };
+    update_category_api_v1_catalog_categories__category_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryManageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_preview_api_v1_catalog_imports_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_preview_api_v1_catalog_imports_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_commit_api_v1_catalog_imports_commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportCommit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReport"];
                 };
             };
             /** @description Validation Error */

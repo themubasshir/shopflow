@@ -1,14 +1,30 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+import uuid
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import Principal, get_principal
+from app.api.deps import Principal, get_authenticated_principal, get_principal
 from app.db.session import get_db
 from app.models import Category, Product, ProductUnit
-from app.schemas.catalog import CategoryOut, ProductOut
+from app.schemas.catalog import (
+    CategoryManageOut,
+    CategoryOut,
+    CategoryWrite,
+    ImportCommit,
+    ImportPreview,
+    ImportReport,
+    ProductDetailOut,
+    ProductOut,
+    ProductStateWrite,
+    ProductUpdate,
+    ProductWrite,
+)
 from app.schemas.common import Paginated
+from app.services import catalog as catalog_service
+from app.services.catalog import ImportParseError
 from app.services.stock import available_stock, shop_date
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
@@ -58,13 +74,17 @@ def list_products(
     )
     if q:
         like = f"%{q.lower()}%"
+        alias = func.unnest(Product.search_aliases).table_valued("alias")
         stmt = stmt.where(
             or_(
                 func.lower(Product.name_en).like(like),
                 func.lower(Product.sku).like(like),
                 func.lower(Product.name_bn).like(like),
                 func.lower(Product.barcode).like(like),
-                Product.search_aliases.any(func.lower(q)),
+                select(1)
+                .select_from(alias)
+                .where(func.lower(alias.column).like(like))
+                .exists(),
             )
         )
     if medicine_only:
@@ -108,3 +128,125 @@ def list_products(
         for p, c, stock in rows
     ]
     return Paginated(items=items, total=total, limit=limit, offset=offset)
+
+
+# --- Phase 2E-2: catalog management (write) -----------------------------------
+
+
+@router.get("/products/{product_id}", response_model=ProductDetailOut)
+def get_product(
+    product_id: uuid.UUID,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> ProductDetailOut:
+    product = catalog_service.product_by_id(db, principal, product_id)
+    return catalog_service._product_detail(db, product)
+
+
+@router.post("/products", response_model=ProductDetailOut, status_code=201)
+def create_product(
+    body: ProductWrite,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> ProductDetailOut:
+    return catalog_service.create_product(db, principal, body)
+
+
+@router.put("/products/{product_id}", response_model=ProductDetailOut)
+def update_product(
+    product_id: uuid.UUID,
+    body: ProductUpdate,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> ProductDetailOut:
+    return catalog_service.update_product(db, principal, product_id, body)
+
+
+@router.patch("/products/{product_id}/state", response_model=ProductDetailOut)
+def set_product_state(
+    product_id: uuid.UUID,
+    body: ProductStateWrite,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> ProductDetailOut:
+    return catalog_service.set_product_active(db, principal, product_id, body.is_active)
+
+
+@router.delete("/products/{product_id}", status_code=204)
+def delete_product(
+    product_id: uuid.UUID,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> None:
+    catalog_service.delete_product(db, principal, product_id)
+
+
+# --- Category management ------------------------------------------------------
+
+
+@router.get("/categories/manage", response_model=list[CategoryManageOut])
+def list_categories_manage(
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> list[CategoryManageOut]:
+    principal.require("catalog:write")
+    return catalog_service.list_managed_categories(db, principal)
+
+
+@router.post("/categories", response_model=CategoryManageOut, status_code=201)
+def create_category(
+    body: CategoryWrite,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> CategoryManageOut:
+    return catalog_service.save_category(db, principal, body)
+
+
+@router.put("/categories/{category_id}", response_model=CategoryManageOut)
+def update_category(
+    category_id: uuid.UUID,
+    body: CategoryWrite,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> CategoryManageOut:
+    return catalog_service.save_category(db, principal, body, category_id)
+
+
+# --- Bulk import --------------------------------------------------------------
+
+
+@router.post("/imports/preview", response_model=ImportPreview)
+async def import_preview(
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+) -> ImportPreview:
+    principal.require("catalog:write")
+    raw = await file.read()
+    try:
+        parsed = catalog_service.parse_import_file(file.filename or "", raw)
+    except ImportParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    rows = catalog_service.preview_import_rows(db, principal, parsed)
+    create_n = sum(1 for r in rows if r.action == "create")
+    dup_n = sum(1 for r in rows if r.action == "duplicate")
+    invalid_n = sum(1 for r in rows if r.action == "invalid")
+    return ImportPreview(
+        batch_id=uuid.uuid4(),
+        filename=file.filename or "",
+        total_rows=len(rows),
+        create_count=create_n,
+        duplicate_count=dup_n,
+        invalid_count=invalid_n,
+        rows=rows,
+    )
+
+
+@router.post("/imports/commit", response_model=ImportReport)
+def import_commit(
+    body: ImportCommit,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> ImportReport:
+    return catalog_service.commit_import(db, principal, body)

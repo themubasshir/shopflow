@@ -14,6 +14,7 @@ import {
   UserCog,
   MonitorSmartphone,
   MoreHorizontal,
+  Tags,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
   billing: Receipt,
   inventory: Package,
+  products: Tags,
   customers: Users,
   loyalty: Gift,
   reports: BarChart3,
