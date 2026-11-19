@@ -3,6 +3,8 @@ import { Store, MonitorSmartphone, Globe, Printer, Users } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { verifySession, hasPermission } from "@/lib/session";
+import { ReceiptSettingsEditor } from "./receipt-settings";
 import { api } from "@/lib/api";
 import type { Locale } from "@/i18n/config";
 
@@ -13,7 +15,10 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const t = await getTranslations({ locale, namespace: "settings" });
   const tApp = await getTranslations({ locale, namespace: "app" });
 
-  const dashboard = await api.dashboard().catch(() => null);
+  const tReceipt = await getTranslations({ locale, namespace: "receipts" });
+  const [dashboard, session] = await Promise.all([api.dashboard().catch(() => null), verifySession()]);
+  const canEditReceipt = session?.me.role === "owner" && hasPermission(session.me, "settings:write");
+  const receipt = canEditReceipt ? await api.receiptSettings().catch(() => null) : null;
 
   const rows = [
     { icon: Store, label: t("shop"), value: `${tApp("name")} · ${tApp("tagline")}` },
@@ -57,6 +62,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
           <Badge variant="success">BDT ৳</Badge>
         </div>
       </Card>
+      {canEditReceipt && (receipt ? <ReceiptSettingsEditor settings={receipt} /> : <p role="alert">{tReceipt("loadError")}</p>)}
     </div>
   );
 }

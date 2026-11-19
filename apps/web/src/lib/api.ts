@@ -63,7 +63,9 @@ export const api = {
   customerLoyaltyHistory: (id: string, offset: number) => request<import("@/types").Paginated<import("@/types").LoyaltyEntryOut>>(`/customers/${id}/loyalty/transactions?offset=${offset}`),
   loyaltyAccounts: (offset = 0) =>
     request<import("@/types").Paginated<import("@/types").LoyaltyAccountOut>>("/loyalty/accounts?limit=24&offset=" + offset),
-  invoices: () => request<import("@/types").Paginated<import("@/types").InvoiceOut>>("/invoices"),
+  invoices: (query = new URLSearchParams()) => request<import("@/types").Paginated<import("@/types").InvoiceOut>>("/invoices?" + query),
+  invoiceReceipt: (id: string) => request<import("@/types").InvoiceReceipt>(`/invoices/${encodeURIComponent(id)}/receipt`),
+  receiptSettings: () => request<import("@/types").ReceiptSettings>("/settings/receipts"),
 
   // ---- Phase 2B: session / employees / counter management ------------------
   me: () => request<import("@/lib/session").Me>("/auth/me"),

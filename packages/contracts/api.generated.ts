@@ -207,6 +207,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/invoices/{invoice_id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Invoice Receipt */
+        get: operations["invoice_receipt_api_v1_invoices__invoice_id__receipt_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Receipt Settings */
+        get: operations["read_receipt_settings_api_v1_settings_receipts_get"];
+        /** Save Receipt Settings */
+        put: operations["save_receipt_settings_api_v1_settings_receipts_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -1134,6 +1169,50 @@ export interface components {
              */
             readonly payment_status: "paid" | "partially_paid" | "due";
         };
+        /** InvoiceReceipt */
+        InvoiceReceipt: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Invoice Number */
+            invoice_number: string;
+            /** Issued At */
+            issued_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "finalized" | "voided" | "refunded";
+            /** Voided At */
+            voided_at: string | null;
+            identity: components["schemas"]["ReceiptIdentity"];
+            /** Items */
+            items: components["schemas"]["ReceiptLine"][];
+            /** Subtotal */
+            subtotal: string;
+            /** Discount Total */
+            discount_total: string;
+            /** Loyalty Discount */
+            loyalty_discount: string;
+            /** Tax Total */
+            tax_total: string;
+            /** Total */
+            total: string;
+            /** Paid Total */
+            paid_total: string;
+            /** Due Total */
+            due_total: string;
+            /** Payments */
+            payments: components["schemas"]["ReceiptTender"][];
+            /** Loyalty Points Redeemed */
+            loyalty_points_redeemed: number;
+            /** Loyalty Points Earned */
+            loyalty_points_earned: number;
+            /** Loyalty Points Balance */
+            loyalty_points_balance: number | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -1377,6 +1456,114 @@ export interface components {
             loyalty_eligible: boolean;
             /** Nearest Expiry */
             nearest_expiry?: string | null;
+        };
+        /** ReceiptIdentity */
+        ReceiptIdentity: {
+            branding?: components["schemas"]["ReceiptSettings"] | null;
+            /**
+             * Currency
+             * @default BDT
+             */
+            currency: string;
+            /**
+             * Timezone
+             * @default Asia/Dhaka
+             */
+            timezone: string;
+            /** Counter Code */
+            counter_code?: string | null;
+            /** Counter Name En */
+            counter_name_en?: string | null;
+            /** Counter Name Bn */
+            counter_name_bn?: string | null;
+            /** Cashier */
+            cashier?: string | null;
+            /** Customer Name */
+            customer_name?: string | null;
+            /** Customer Name Bn */
+            customer_name_bn?: string | null;
+            /** Customer Phone Masked */
+            customer_phone_masked?: string | null;
+            /**
+             * Source
+             * @default unavailable
+             * @enum {string}
+             */
+            source: "sale" | "legacy_migration" | "unavailable";
+        };
+        /** ReceiptLine */
+        ReceiptLine: {
+            /** Name Bn */
+            name_bn?: string | null;
+            /** Unit En */
+            unit_en?: string | null;
+            /** Unit Bn */
+            unit_bn?: string | null;
+            /** Batch */
+            batch?: string | null;
+            /** Expiry */
+            expiry?: string | null;
+            /** Description */
+            description: string;
+            /** Quantity */
+            quantity: string;
+            /** Unit Price */
+            unit_price: string;
+            /** Line Discount */
+            line_discount: string;
+            /** Line Total */
+            line_total: string;
+        };
+        /** ReceiptSettings */
+        ReceiptSettings: {
+            /** Shop Name En */
+            shop_name_en: string;
+            /** Shop Name Bn */
+            shop_name_bn?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Trade License */
+            trade_license?: string | null;
+            /** Tax Registration */
+            tax_registration?: string | null;
+            /** Heading En */
+            heading_en?: string | null;
+            /** Heading Bn */
+            heading_bn?: string | null;
+            /** Footer En */
+            footer_en?: string | null;
+            /** Footer Bn */
+            footer_bn?: string | null;
+            /** Return Policy En */
+            return_policy_en?: string | null;
+            /** Return Policy Bn */
+            return_policy_bn?: string | null;
+            /**
+             * Preferred Language
+             * @default en
+             * @enum {string}
+             */
+            preferred_language: "en" | "bn" | "bilingual";
+            /**
+             * Paper Width Mm
+             * @default 80
+             * @constant
+             */
+            paper_width_mm: 80;
+            /**
+             * Printable Width Mm
+             * @default 72
+             */
+            printable_width_mm: number;
+        };
+        /** ReceiptTender */
+        ReceiptTender: {
+            /** Method */
+            method: string;
+            /** Amount */
+            amount: string;
         };
         /** RecentTransaction */
         RecentTransaction: {
@@ -1721,6 +1908,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
+                printable?: boolean;
             };
             header?: never;
             path?: never;
@@ -1779,6 +1968,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvoiceCreateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invoice_receipt_api_v1_invoices__invoice_id__receipt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_receipt_settings_api_v1_settings_receipts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptSettings"];
+                };
+            };
+        };
+    };
+    save_receipt_settings_api_v1_settings_receipts_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptSettings"];
                 };
             };
             /** @description Validation Error */

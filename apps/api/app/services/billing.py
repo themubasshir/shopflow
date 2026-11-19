@@ -35,6 +35,7 @@ from app.services.loyalty_accounts import (
     redemption_discount,
     rule_snapshot,
 )
+from app.services.receipts import capture_receipt_identity
 from app.services.receivables import OverpaymentError, check_credit_limit
 
 MONEY_Q = Decimal("0.01")
@@ -121,6 +122,12 @@ def _price_items(
                     product_id=pid,
                     product_unit_id=unit.id,
                     description=product.name_en,
+                    receipt_details={
+                        "name_bn": product.name_bn,
+                        "unit_en": unit.name,
+                        "unit_bn": unit.name_bn,
+                        "position": len(items),
+                    },
                     quantity=quantity,
                     unit_price=unit.selling_price,
                     line_discount=discount,
@@ -265,6 +272,7 @@ def _finalize_invoice(
         total=total,
         paid_total=paid,
         due_total=due,
+        receipt_identity=capture_receipt_identity(db, principal, counter, customer),
         loyalty_points_earned=0,
         loyalty_points_redeemed=body.redeem_points,
         loyalty_rule_snapshot=rule_snapshot(db, shop_id) if account else None,
@@ -304,6 +312,7 @@ def _finalize_invoice(
     if account and body.redeem_points:
         record_redemption(db, account, invoice, principal.user_id)
     points = award_qualified_points(db, account, invoice, principal.user_id)
+    invoice.receipt_points_balance = account.points_balance if account else None
     if due:
         db.add(CustomerLedgerEntry(customer_id=customer.id, invoice_id=invoice.id, amount=due))
     db.add(

@@ -12,7 +12,17 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.deps import get_principal  # noqa: F401  (import keeps dependency visible)
-from app.api.v1 import auth, catalog, counters, customers, employees, health, reports, sales
+from app.api.v1 import (
+    auth,
+    catalog,
+    counters,
+    customers,
+    employees,
+    health,
+    receipts,
+    reports,
+    sales,
+)
 from app.core.config import settings
 from app.core.errors import AppError
 
@@ -128,6 +138,7 @@ app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(reports.router, prefix=settings.api_v1_prefix)
 app.include_router(catalog.router, prefix=settings.api_v1_prefix)
 app.include_router(sales.router, prefix=settings.api_v1_prefix)
+app.include_router(receipts.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.router, prefix=settings.api_v1_prefix)
 app.include_router(employees.router, prefix=settings.api_v1_prefix)
 app.include_router(counters.router, prefix=settings.api_v1_prefix)

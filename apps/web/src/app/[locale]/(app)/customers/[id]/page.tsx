@@ -23,6 +23,7 @@ export default async function CustomerPage({ params, searchParams }: {
     params, searchParams, getLocale(), getTranslations("customers"), verifySession(),
   ]);
   if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) notFound();
+  const receiptsText = await getTranslations("receipts");
   const me = session?.me;
   const history = Boolean(me && me.assigned_counter_ids === null && hasPermission(me, "reports:read"));
   const hasSales = Boolean(me && hasPermission(me, "sales:read"));
@@ -115,6 +116,9 @@ export default async function CustomerPage({ params, searchParams }: {
                         <span>{t("paid")} · {formatBDT(row.paid_total)}</span>
                         <span>{t("due")} · {formatBDT(row.due_total)}</span>
                       </p>
+                      {hasSales && row.status !== "draft" && (
+                        <Link href={`/invoices/${row.id}`} className={secondaryButton}>{receiptsText("open")}</Link>
+                      )}
                       {canCollect && row.status === "finalized" && <DuePaymentForm customerId={id} invoice={row} />}
                     </>
                   ) : "method" in row ? (

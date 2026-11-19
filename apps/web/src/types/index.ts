@@ -228,3 +228,6 @@ export type CustomerBalanceOut = components["schemas"]["CustomerBalanceOut"];
 export type CustomerLedgerEntryOut = components["schemas"]["CustomerLedgerEntryOut"];
 export type DuePaymentCreate = components["schemas"]["DuePaymentCreate"];
 export type DuePaymentOut = components["schemas"]["DuePaymentOut"];
+
+export type InvoiceReceipt = components["schemas"]["InvoiceReceipt"];
+export type ReceiptSettings = components["schemas"]["ReceiptSettings"];

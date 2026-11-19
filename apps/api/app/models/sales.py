@@ -86,6 +86,8 @@ class Invoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Integer, nullable=False, server_default="0"
     )
     loyalty_rule_snapshot: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    receipt_identity: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    receipt_points_balance: Mapped[int | None] = mapped_column(Integer)
     loyalty_earn_base: Mapped[Decimal | None] = mapped_column(MONEY)
     idempotency_key: Mapped[str | None] = mapped_column(String(120))
     created_by: Mapped[uuid.UUID | None] = mapped_column(
@@ -144,6 +146,7 @@ class InvoiceItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     batch_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("medicine_batches.id", ondelete="SET NULL")
     )
+    receipt_details: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     description: Mapped[str] = mapped_column(String(240), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(QUANTITY, nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(MONEY, nullable=False)

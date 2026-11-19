@@ -108,6 +108,9 @@ class LoyaltyTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="uq_loyalty_transactions_account_invoice_type",
         ),
         Index("ix_loyalty_transactions_account_id_created_at", "account_id", "created_at"),
+        Index(
+            "ix_loyalty_transactions_invoice_id_ledger_sequence", "invoice_id", "ledger_sequence"
+        ),
     )
 
 

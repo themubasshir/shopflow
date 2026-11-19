@@ -12,10 +12,10 @@ import {
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { ApiError, browserRequest, newIdempotencyKey } from "@/lib/api-client";
 import { formatBDT, localizedName, formatNumber } from "@/lib/format";
-import { fieldClass, localDigits, minorUnits, secondaryButton } from "@/components/ui/pos-form";
+import { fieldClass, localDigits, minorUnits, primaryButton, secondaryButton } from "@/components/ui/pos-form";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -74,6 +74,7 @@ export function BillingClient({
   canRedeem: boolean;
 }) {
   const t = useTranslations("billing");
+  const receiptsText = useTranslations("receipts");
   const customersText = useTranslations("customers");
   const router = useRouter();
 
@@ -294,6 +295,7 @@ export function BillingClient({
           </p>
         </div>
 
+        <Link href="/invoices" className={secondaryButton + " mb-3 mr-2"}>{receiptsText("history")}</Link>
         {cart.length > 0 && (
           <a href="#checkout-cart" className={secondaryButton + " sticky top-16 z-10 mb-3 lg:hidden"}>{t("viewCart", { count: cart.length })}</a>
         )}
@@ -689,13 +691,10 @@ export function BillingClient({
             {Number(receipt.due_total) > 0 && receipt.loyalty_points_balance !== null && (
               <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">{t("earnOnSettlement")}</p>
             )}
-            <button
-              type="button"
-              onClick={resetBill}
-              className="mt-6 min-h-[52px] w-full rounded-xl bg-[var(--color-primary)] text-base font-bold text-white hover:bg-[var(--color-primary-strong)]"
-            >
-              {t("newBill")}
-            </button>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <Link className={primaryButton} href={`/invoices/${receipt.id}`}>{receiptsText("open")}</Link>
+              <button type="button" onClick={resetBill} className={secondaryButton}>{t("newBill")}</button>
+            </div>
           </div>
         </BillingDialog>
       ) : null}

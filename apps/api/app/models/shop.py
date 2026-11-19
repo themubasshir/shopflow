@@ -15,7 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -34,6 +34,7 @@ class Shop(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="BDT")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, server_default="Asia/Dhaka")
     receipt_header: Mapped[str | None] = mapped_column(Text)
+    receipt_settings: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     receipt_footer: Mapped[str | None] = mapped_column(Text)
     vat_number: Mapped[str | None] = mapped_column(String(64))
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))

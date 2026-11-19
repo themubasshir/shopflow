@@ -400,5 +400,55 @@
       "network": "Can't reach the server — check your connection",
       "unknown": "Something went wrong — please try again"
     }
+  },
+  "receipts": {
+    "history": "Invoice history",
+    "backBilling": "Back to billing",
+    "preview": "Receipt preview",
+    "open": "View receipt",
+    "searchInvoice": "Search by invoice number",
+    "empty": "No invoices found",
+    "loadError": "The receipt could not be loaded.",
+    "loading": "Loading receipt…",
+    "retry": "Retry",
+    "print": "Print receipt",
+    "printError": "The print dialog could not be opened.",
+    "download": "Download PDF",
+    "downloading": "Preparing PDF…",
+    "downloadError": "The PDF could not be prepared. Try again.",
+    "language": "Receipt language",
+    "settings": "Receipt settings",
+    "settingsHint": "Changes apply to future invoices. Printable width can be 58–76 mm on the 80 mm roll.",
+    "saving": "Saving…",
+    "save": "Save receipt settings",
+    "saved": "Receipt settings saved.",
+    "saveError": "Settings could not be saved. Check the fields and try again.",
+    "nameRequired": "Enter the shop name.",
+    "languages": {
+      "en": "English",
+      "bn": "Bangla",
+      "bilingual": "English + Bangla"
+    },
+    "status": {
+      "voided": "Voided",
+      "refunded": "Refunded"
+    },
+    "fields": {
+      "shop_name_en": "Shop name (English)",
+      "shop_name_bn": "Shop name (Bangla)",
+      "address": "Shop address",
+      "phone": "Contact phone",
+      "trade_license": "Trade license number",
+      "tax_registration": "Tax registration number",
+      "heading_en": "Receipt heading (English)",
+      "heading_bn": "Receipt heading (Bangla)",
+      "footer_en": "Footer (English)",
+      "footer_bn": "Footer (Bangla)",
+      "return_policy_en": "Return policy (English)",
+      "return_policy_bn": "Return policy (Bangla)",
+      "preferred_language": "Preferred receipt language",
+      "paper_width_mm": "Paper width (mm)",
+      "printable_width_mm": "Printable width (mm)"
+    }
   }
 }

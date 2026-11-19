@@ -92,6 +92,8 @@ def list_invoices(
     db: Session = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    q: str | None = Query(default=None, max_length=40),
+    printable: bool = False,
 ) -> Paginated[InvoiceOut]:
     principal.require("sales:read")
     stmt = (
@@ -99,6 +101,10 @@ def list_invoices(
         .join(Counter, Invoice.counter_id == Counter.id)
         .where(Invoice.shop_id == principal.shop_id)
     )
+    if q and q.strip():
+        stmt = stmt.where(Invoice.invoice_number.icontains(q.strip(), autoescape=True))
+    if printable:
+        stmt = stmt.where(Invoice.status.in_(("finalized", "voided", "refunded")))
     # Cashiers (and anyone restricted to assigned counters) only see the
     # invoice history for their own counters — not the whole shop's book.
     if principal.assigned_counter_ids is not None:
@@ -107,8 +113,8 @@ def list_invoices(
         stmt = stmt.where(Invoice.counter_id.in_(principal.assigned_counter_ids))
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.execute(
-        stmt.options(selectinload(Invoice.items), selectinload(Invoice.payments))
-        .order_by(Invoice.created_at.desc())
+        stmt.options(selectinload(Invoice.payments))
+        .order_by(Invoice.created_at.desc(), Invoice.id)
         .limit(limit)
         .offset(offset)
     ).all()
