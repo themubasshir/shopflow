@@ -19,6 +19,8 @@ from app.api.v1 import (
     customers,
     employees,
     health,
+    inventory,
+    purchasing,
     receipts,
     reports,
     sales,
@@ -139,6 +141,8 @@ app.include_router(reports.router, prefix=settings.api_v1_prefix)
 app.include_router(catalog.router, prefix=settings.api_v1_prefix)
 app.include_router(sales.router, prefix=settings.api_v1_prefix)
 app.include_router(receipts.router, prefix=settings.api_v1_prefix)
+app.include_router(purchasing.router, prefix=settings.api_v1_prefix)
+app.include_router(inventory.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.router, prefix=settings.api_v1_prefix)
 app.include_router(employees.router, prefix=settings.api_v1_prefix)
 app.include_router(counters.router, prefix=settings.api_v1_prefix)

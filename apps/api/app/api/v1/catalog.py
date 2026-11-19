@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.models import Category, Product, ProductUnit
 from app.schemas.catalog import CategoryOut, ProductOut
 from app.schemas.common import Paginated
+from app.services.stock import available_stock, shop_date
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
@@ -42,15 +43,16 @@ def list_categories(
 def list_products(
     principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
-    q: str | None = Query(default=None, description="Name, alias or barcode"),
+    q: str | None = Query(default=None, description="Name, SKU, alias or barcode"),
     category_id: str | None = Query(default=None),
     medicine_only: bool = False,
     low_stock_only: bool = False,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> Paginated[ProductOut]:
+    saleable = available_stock(shop_date(db, principal.shop_id))
     stmt = (
-        select(Product, Category)
+        select(Product, Category, saleable)
         .join(Category, Product.category_id == Category.id)
         .where(Product.shop_id == principal.shop_id, Product.is_active.is_(True))
     )
@@ -59,6 +61,7 @@ def list_products(
         stmt = stmt.where(
             or_(
                 func.lower(Product.name_en).like(like),
+                func.lower(Product.sku).like(like),
                 func.lower(Product.name_bn).like(like),
                 func.lower(Product.barcode).like(like),
                 Product.search_aliases.any(func.lower(q)),
@@ -67,7 +70,7 @@ def list_products(
     if medicine_only:
         stmt = stmt.where(Product.is_medicine.is_(True))
     if low_stock_only:
-        stmt = stmt.where(Product.stock_on_hand <= Product.low_stock_threshold)
+        stmt = stmt.where(saleable <= Product.low_stock_threshold)
     if category_id:
         stmt = stmt.where(Category.id == category_id)
 
@@ -75,7 +78,7 @@ def list_products(
     rows = db.execute(stmt.order_by(Product.name_en).limit(limit).offset(offset)).all()
 
     # Pull the base unit price for display.
-    product_ids = [p.id for p, _ in rows]
+    product_ids = [p.id for p, _, _ in rows]
     price_map = {}
     if product_ids:
         for unit in db.execute(
@@ -95,13 +98,13 @@ def list_products(
             unit=p.unit,
             is_medicine=p.is_medicine,
             is_active=p.is_active,
-            stock_on_hand=p.stock_on_hand,
+            stock_on_hand=stock,
             low_stock_threshold=p.low_stock_threshold,
             price=price_map.get(p.id),
             category_name_en=c.name_en,
             category_name_bn=c.name_bn,
             loyalty_eligible=p.loyalty_eligible and c.loyalty_eligible,
         )
-        for p, c in rows
+        for p, c, stock in rows
     ]
     return Paginated(items=items, total=total, limit=limit, offset=offset)

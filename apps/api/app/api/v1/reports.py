@@ -20,6 +20,7 @@ from app.models.catalog import Category
 from app.schemas.catalog import ExpiryAlert, LowStockAlert
 from app.schemas.reports import DashboardResponse, DashboardSummary, SalesPoint
 from app.schemas.shop import CounterActivity, RecentTransaction
+from app.services.stock import available_stock, shop_date
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -47,19 +48,21 @@ def dashboard(
     average_bill = (today_sales / invoice_count) if invoice_count else 0
 
     # Low stock and medicine expiry alerts.
+    expiry_today = shop_date(db, shop_id)
+    saleable = available_stock(expiry_today)
     low_stock_rows = db.execute(
-        select(Product, Category.name_en)
+        select(Product, Category.name_en, saleable)
         .join(Category, Product.category_id == Category.id)
         .where(
             Product.shop_id == shop_id,
             Product.is_active.is_(True),
-            Product.stock_on_hand <= Product.low_stock_threshold,
+            saleable <= Product.low_stock_threshold,
         )
-        .order_by(Product.stock_on_hand)
+        .order_by(saleable)
         .limit(8)
     ).all()
 
-    expiry_cutoff = today + timedelta(days=EXPIRY_WINDOW_DAYS)
+    expiry_cutoff = expiry_today + timedelta(days=EXPIRY_WINDOW_DAYS)
     expiring_rows = db.execute(
         select(MedicineBatch, Product)
         .join(Product, MedicineBatch.product_id == Product.id)
@@ -173,11 +176,11 @@ def dashboard(
                 sku=p.sku,
                 name_en=p.name_en,
                 name_bn=p.name_bn,
-                stock_on_hand=p.stock_on_hand,
+                stock_on_hand=stock,
                 low_stock_threshold=p.low_stock_threshold,
                 category_name_en=cat,
             )
-            for p, cat in low_stock_rows
+            for p, cat, stock in low_stock_rows
         ],
         expiring=[
             ExpiryAlert(
@@ -189,7 +192,7 @@ def dashboard(
                 batch_number=b.batch_number,
                 expiry_date=b.expiry_date,
                 quantity_on_hand=b.quantity_on_hand,
-                days_to_expiry=(b.expiry_date - today).days,
+                days_to_expiry=(b.expiry_date - expiry_today).days,
             )
             for b, p in expiring_rows
         ],

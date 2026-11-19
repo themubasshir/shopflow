@@ -205,6 +205,9 @@ class MedicineBatch(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     batch_number: Mapped[str] = mapped_column(String(64), nullable=False)
     expiry_date: Mapped[date] = mapped_column(Date, nullable=False)
+    quantity_received: Mapped[Decimal] = mapped_column(QUANTITY, nullable=False, server_default="0")
+    manufacture_date: Mapped[date | None] = mapped_column(Date)
+    quarantined: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     quantity_on_hand: Mapped[Decimal] = mapped_column(QUANTITY, nullable=False, server_default="0")
     purchase_cost: Mapped[Decimal | None] = mapped_column(MONEY)
     mrp: Mapped[Decimal | None] = mapped_column(MONEY)
@@ -223,6 +226,14 @@ class MedicineBatch(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("quantity_on_hand >= 0", name="quantity_on_hand_non_negative"),
         Index("ix_medicine_batches_shop_id_expiry_date", "shop_id", "expiry_date"),
         Index("ix_medicine_batches_product_id_expiry_date", "product_id", "expiry_date"),
+        Index(
+            "ix_batches_sellable",
+            "product_id",
+            "expiry_date",
+            "id",
+            postgresql_where=text("is_active AND NOT quarantined AND quantity_on_hand > 0"),
+        ),
+        CheckConstraint("quantity_received >= quantity_on_hand", name="received_projection"),
     )
 
 
@@ -233,6 +244,7 @@ class Supplier(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
+    name_bn: Mapped[str | None] = mapped_column(String(160))
     contact_person: Mapped[str | None] = mapped_column(String(120))
     phone: Mapped[str | None] = mapped_column(String(32))
     email: Mapped[str | None] = mapped_column(String(255))

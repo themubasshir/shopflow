@@ -19,7 +19,7 @@ from pathlib import Path
 # Allow `python seed.py` directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps" / "api"))
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.core.permissions import (
@@ -260,6 +260,7 @@ def seed(db) -> None:
                 batch_number=med.get("batch_number", f"B{sku[-3:]}"),
                 expiry_date=date.today() + timedelta(days=med.get("days_to_expiry", 365)),
                 quantity_on_hand=Decimal(stock),
+                quantity_received=Decimal(stock),
                 purchase_cost=Decimal(price) * Decimal("0.82"),
                 mrp=Decimal(price) * Decimal("1.08"),
             )
@@ -646,6 +647,36 @@ def seed_invoices(db) -> None:
                         )
                     )
 
+    db.flush()
+    for batch in db.scalars(select(MedicineBatch).where(MedicineBatch.shop_id == shop.id)):
+        if batch.quantity_on_hand:
+            db.add(
+                StockMovement(
+                    shop_id=shop.id,
+                    product_id=batch.product_id,
+                    batch_id=batch.id,
+                    movement_type="opening",
+                    quantity=batch.quantity_on_hand,
+                    note="Demo batch opening",
+                )
+            )
+    db.flush()
+    for product in product_list:
+        ledger = db.scalar(
+            select(func.coalesce(func.sum(StockMovement.quantity), 0)).where(
+                StockMovement.product_id == product.id
+            )
+        )
+        if product.stock_on_hand != ledger:
+            db.add(
+                StockMovement(
+                    shop_id=shop.id,
+                    product_id=product.id,
+                    movement_type="opening",
+                    quantity=product.stock_on_hand - ledger,
+                    note="Demo product opening",
+                )
+            )
     db.commit()
     print(
         f"seeded: {invoice_no} invoices across 3 counters, "

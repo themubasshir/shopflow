@@ -231,3 +231,11 @@ export type DuePaymentOut = components["schemas"]["DuePaymentOut"];
 
 export type InvoiceReceipt = components["schemas"]["InvoiceReceipt"];
 export type ReceiptSettings = components["schemas"]["ReceiptSettings"];
+
+export type InventorySupplier = components["schemas"]["SupplierOut"];
+export type SupplierEntry = components["schemas"]["SupplierEntry"];
+export type InventoryPurchase = components["schemas"]["PurchaseOut"];
+export type InventoryBatch = components["schemas"]["BatchOut"];
+export type InventoryUnit = components["schemas"]["ProductUnitOut"];
+export type InventoryMovement = components["schemas"]["MovementOut"];
+export type InventoryValue = components["schemas"]["StockValue"];

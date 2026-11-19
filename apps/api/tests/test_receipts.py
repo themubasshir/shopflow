@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -78,6 +78,15 @@ def catalog():
             unit="pack",
             stock_on_hand=30,
             is_medicine=True,
+            batches=[
+                MedicineBatch(
+                    shop_id=shop.id,
+                    batch_number="BATCH-42",
+                    expiry_date=date.today() + timedelta(days=365),
+                    quantity_on_hand=30,
+                    quantity_received=30,
+                )
+            ],
             units=[ProductUnit(name="pack", name_bn="প্যাক", is_base=True, selling_price="300.00")],
         )
         db.add_all([goods, medicine])
@@ -282,7 +291,7 @@ async def test_receipt_permissions_history_search_and_missing_invoice(client, ca
 
 @pytest.mark.anyio
 async def test_receipt_prefers_recorded_batch_and_void_status(client, catalog):
-    shop_id, counters, (_, medicine) = catalog
+    _, counters, (_, medicine) = catalog
     owner = await login(client, "owner")
     out = await sale(client, owner, counters[0], [{"product_id": str(medicine), "quantity": "1"}])
     with SessionLocal() as db:
@@ -290,19 +299,12 @@ async def test_receipt_prefers_recorded_batch_and_void_status(client, catalog):
         invoice.status = "voided"
         invoice.voided_at = invoice.finalized_at
         item = invoice.items[0]
-        batch = MedicineBatch(
-            shop_id=shop_id,
-            product_id=medicine,
-            batch_number="BATCH-42",
-            expiry_date=date(2028, 1, 2),
-        )
-        db.add(batch)
-        db.flush()
-        item.batch_id = batch.id
-        db.commit()
+        batch = db.get(MedicineBatch, item.batch_id)
+        expiry = batch.expiry_date.isoformat()
         batch.batch_number = "CHANGED"
         db.commit()
     receipt = (await client.get(f"/api/v1/invoices/{out['id']}/receipt", headers=owner)).json()
     assert receipt["status"] == "voided" and receipt["voided_at"]
     assert receipt["items"][0]["batch"] == "BATCH-42"
-    assert receipt["items"][0]["expiry"] == "2028-01-02"
+    assert receipt["items"][0]["expiry"] == expiry
+    assert receipt["items"][0]["batch_allocations"][0]["batch_number"] == "BATCH-42"

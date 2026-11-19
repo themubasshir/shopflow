@@ -42,12 +42,19 @@ class ReceiptIdentity(BaseModel):
     source: Literal["sale", "legacy_migration", "unavailable"] = "unavailable"
 
 
+class ReceiptBatchAllocation(BaseModel):
+    batch_number: str
+    expiry_date: date
+    quantity: Decimal
+
+
 class ReceiptLineIdentity(BaseModel):
     name_bn: str | None = None
     unit_en: str | None = None
     unit_bn: str | None = None
     batch: str | None = None
     expiry: date | None = None
+    batch_allocations: list[ReceiptBatchAllocation] = Field(default_factory=list)
 
 
 class ReceiptLine(ReceiptLineIdentity):

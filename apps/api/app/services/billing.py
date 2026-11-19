@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy import Integer, cast, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.api.deps import Principal, assert_counter_allowed
 from app.core.errors import ConflictError, InsufficientStockError, NotFoundError, ValidationError
@@ -19,11 +19,11 @@ from app.models import (
     Counter,
     CustomerLedgerEntry,
     Invoice,
+    InvoiceBatchAllocation,
     InvoiceCounter,
     InvoiceItem,
     Payment,
     Product,
-    StockMovement,
 )
 from app.schemas.sales import InvoiceCreate, InvoiceCreateOut, InvoiceItemOut, PaymentOut
 from app.services.customers import get_customer
@@ -37,6 +37,7 @@ from app.services.loyalty_accounts import (
 )
 from app.services.receipts import capture_receipt_identity
 from app.services.receivables import OverpaymentError, check_credit_limit
+from app.services.stock import lock_products, plan_sale, post_stock
 
 MONEY_Q = Decimal("0.01")
 _DISCRETE_UNITS = {"piece", "pack", "strip", "box", "bottle", "sachet"}
@@ -52,22 +53,11 @@ def request_fingerprint(body: InvoiceCreate) -> str:
     return fingerprint(payload)
 
 
-def _lock_products(db: Session, shop_id: UUID, product_ids: list[UUID]) -> dict[UUID, Product]:
-    rows = db.scalars(
-        select(Product)
-        .options(selectinload(Product.units), selectinload(Product.category))
-        .where(Product.shop_id == shop_id, Product.id.in_(product_ids))
-        .order_by(Product.id)
-        .with_for_update(key_share=True)
-    ).all()
-    return {product.id: product for product in rows}
-
-
 def _price_items(
     db: Session, shop_id: UUID, body: InvoiceCreate
 ) -> tuple[list[tuple[Product, Decimal, InvoiceItem]], Decimal, Decimal, Decimal]:
     product_ids = sorted({line.product_id for line in body.items})
-    products = _lock_products(db, shop_id, product_ids)
+    products = lock_products(db, shop_id, product_ids)
     for pid in product_ids:
         if pid not in products:
             raise NotFoundError("Product not found", details={"product_id": str(pid)})
@@ -140,7 +130,7 @@ def _price_items(
 
     for pid, base_qty in requested.items():
         available = products[pid].stock_on_hand
-        if available < base_qty:
+        if not products[pid].is_medicine and available < base_qty:
             raise InsufficientStockError(
                 "Insufficient stock",
                 details={
@@ -237,6 +227,23 @@ def _finalize_invoice(
             raise NotFoundError("Active customer not found")
 
     items, subtotal, line_discounts, eligible = _price_items(db, shop_id, body)
+    finalized_at = datetime.now(UTC)
+    allocations = plan_sale(db, shop_id, items, finalized_at)
+    for (_, _, item), portions in zip(items, allocations, strict=True):
+        if portions:
+            if len(portions) == 1:
+                item.batch_id = portions[0][0].id
+            item.receipt_details = {
+                **item.receipt_details,
+                "batch_allocations": [
+                    {
+                        "batch_number": batch.batch_number,
+                        "expiry_date": batch.expiry_date.isoformat(),
+                        "quantity": str(quantity),
+                    }
+                    for batch, quantity in portions
+                ],
+            }
     manual_discount = body.discount_total.quantize(MONEY_Q)
     discount_total = line_discounts + manual_discount
     before_loyalty = subtotal - discount_total
@@ -258,7 +265,6 @@ def _finalize_invoice(
             )
         check_credit_limit(db, customer, due)
 
-    finalized_at = datetime.now(UTC)
     invoice = Invoice(
         shop_id=shop_id,
         counter_id=counter.id,
@@ -295,20 +301,29 @@ def _finalize_invoice(
     )
     db.add(invoice)
     db.flush()
-    for product, base_qty, _ in items:
-        product.stock_on_hand -= base_qty
-        db.add(
-            StockMovement(
-                shop_id=shop_id,
-                product_id=product.id,
-                counter_id=counter.id,
+    for (product, base_qty, item), portions in zip(items, allocations, strict=True):
+        for batch, quantity in portions or [(None, base_qty)]:
+            post_stock(
+                db,
+                principal,
+                product,
+                -quantity,
                 movement_type="sale",
-                quantity=-base_qty,
                 reference_type="invoice",
                 reference_id=invoice.id,
-                created_by=principal.user_id,
+                batch=batch,
+                counter_id=counter.id,
             )
-        )
+            if batch:
+                db.add(
+                    InvoiceBatchAllocation(
+                        invoice_item_id=item.id,
+                        batch_id=batch.id,
+                        quantity=quantity,
+                        batch_number=batch.batch_number,
+                        expiry_date=batch.expiry_date,
+                    )
+                )
     if account and body.redeem_points:
         record_redemption(db, account, invoice, principal.user_id)
     points = award_qualified_points(db, account, invoice, principal.user_id)

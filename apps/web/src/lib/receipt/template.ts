@@ -75,9 +75,12 @@ export async function receiptHtml(receipt: InvoiceReceipt, language: ReceiptLang
   const lines = receipt.items.map((item) => {
     const storedQuantity = item.quantity.includes(".") ? item.quantity.replace(/0+$/, "").replace(/\.$/, "") : item.quantity;
     const unit = bilingual(item.unit_en, item.unit_bn, language);
+    const batchLinks = item.batch_allocations?.map((batch) =>
+      `<div class="meta">${label("batch")} ${html(batch.batch_number)} · ${label("expiry")} ${html(batch.expiry_date)} · ${html(batch.quantity.includes(".") ? batch.quantity.replace(/0+$/, "").replace(/\.$/, "") : batch.quantity)}</div>`
+    ).join("");
     return `<li class="item">
       <div class="name">${bilingual(item.description, item.name_bn, language)}</div>
-      ${item.batch || item.expiry ? `<div class="meta">${item.batch ? label("batch") + " " + html(item.batch) : ""}${item.batch && item.expiry ? " · " : ""}${item.expiry ? label("expiry") + " " + html(item.expiry) : ""}</div>` : ""}
+      ${batchLinks || (item.batch || item.expiry ? `<div class="meta">${item.batch ? label("batch") + " " + html(item.batch) : ""}${item.batch && item.expiry ? " · " : ""}${item.expiry ? label("expiry") + " " + html(item.expiry) : ""}</div>` : "")}
       <div class="line"><div><span class="quantity">${html(storedQuantity)}</span>${unit ? " " + unit : ""} × <span class="quantity">${money(item.unit_price)}</span></div><strong class="quantity">${money(item.line_total)}</strong></div>
       ${nonzero(item.line_discount) ? `<div class="meta">${label("line_discount")} ${money(item.line_discount)}</div>` : ""}
     </li>`;

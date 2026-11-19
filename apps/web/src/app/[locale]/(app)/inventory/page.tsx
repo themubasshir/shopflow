@@ -1,7 +1,10 @@
 import { getTranslations } from "next-intl/server";
 import { PackageSearch } from "lucide-react";
+import { Link } from "@/i18n/navigation";
+import { secondaryButton } from "@/components/ui/pos-form";
+import { hasPermission, verifySession } from "@/lib/session";
 import { api } from "@/lib/api";
-import { formatBDT, formatNumber, localizedName } from "@/lib/format";
+import { formatBDT, formatQuantity, localizedName } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -13,9 +16,11 @@ export default async function InventoryPage({ params }: { params: Promise<{ loca
   const t = await getTranslations({ locale, namespace: "inventory" });
   const tStates = await getTranslations({ locale, namespace: "states" });
 
-  const [products, categories] = await Promise.all([
+  const operations = await getTranslations({ locale, namespace: "inventoryOps" });
+  const [products, categories, session] = await Promise.all([
     api.products({ limit: 100 }).catch(() => null),
     api.categories().catch(() => []),
+    verifySession(),
   ]);
 
   const stockStatus = (p: { stock_on_hand: string; low_stock_threshold: string }) => {
@@ -32,7 +37,8 @@ export default async function InventoryPage({ params }: { params: Promise<{ loca
           <h1 className="text-xl font-bold text-[var(--color-ink)] sm:text-2xl">{t("title")}</h1>
           <p className="text-sm text-[var(--color-muted-foreground)]">{t("subtitle")}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {session && hasPermission(session.me, "reports:read") && <Link href="/inventory/operations" className={secondaryButton}>{operations("title")}</Link>}
           {categories.slice(0, 4).map((c) => (
             <Badge key={c.id} variant="outline">
               {localizedName(c.name_en, c.name_bn, locale)} ({c.product_count})
@@ -80,7 +86,7 @@ export default async function InventoryPage({ params }: { params: Promise<{ loca
                         </Badge>
                       </td>
                       <td className="px-4 py-3 tabular-nums">
-                        {formatNumber(p.stock_on_hand)} {p.unit}
+                        {formatQuantity(p.stock_on_hand)} {p.unit}
                       </td>
                       <td className="px-4 py-3 font-semibold tabular-nums">{formatBDT(p.price)}</td>
                       <td className="px-4 py-3">

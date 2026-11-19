@@ -9,7 +9,15 @@ from app.models.catalog import (
     ProductUnit,
     Supplier,
 )
-from app.models.inventory import Purchase, PurchaseItem, StockMovement
+from app.models.inventory import (
+    InvoiceBatchAllocation,
+    Purchase,
+    PurchaseItem,
+    StockLot,
+    StockMovement,
+    SupplierLedger,
+    SupplierProduct,
+)
 from app.models.loyalty import (
     LoyaltyAccount,
     LoyaltyRedemption,
@@ -28,6 +36,7 @@ __all__ = [
     "CustomerLedgerEntry",
     "IdempotencyRecord",
     "Invoice",
+    "InvoiceBatchAllocation",
     "InvoiceCounter",
     "InvoiceItem",
     "LoyaltyAccount",
@@ -43,8 +52,11 @@ __all__ = [
     "PurchaseItem",
     "Role",
     "Shop",
+    "StockLot",
     "StockMovement",
     "Supplier",
+    "SupplierLedger",
+    "SupplierProduct",
     "User",
     "UserCounter",
 ]

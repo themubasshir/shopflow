@@ -43,8 +43,10 @@ class LoyaltyTransactionType(str, enum.Enum):
 
 class PurchaseStatus(str, enum.Enum):
     DRAFT = "draft"
+    PARTIALLY_RECEIVED = "partially_received"
     RECEIVED = "received"
     VOIDED = "voided"
+    REVERSED = "reversed"
 
 
 class RedemptionStatus(str, enum.Enum):

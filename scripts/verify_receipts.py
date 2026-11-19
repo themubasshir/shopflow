@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 from contextlib import ExitStack
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -21,7 +22,16 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Category, Counter, Customer, LoyaltyAccount, Product, ProductUnit, Shop
+from app.models import (
+    Category,
+    Counter,
+    Customer,
+    LoyaltyAccount,
+    MedicineBatch,
+    Product,
+    ProductUnit,
+    Shop,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 API = ROOT / "apps" / "api"
@@ -77,6 +87,15 @@ def fixtures(db: Session):
         unit="pack",
         stock_on_hand=50,
         is_medicine=True,
+        batches=[
+            MedicineBatch(
+                shop_id=shop.id,
+                batch_number="DEMO-RX-1",
+                expiry_date=date.today() + timedelta(days=365),
+                quantity_on_hand=50,
+                quantity_received=50,
+            )
+        ],
         units=[ProductUnit(name="pack", name_bn="প্যাক", is_base=True, selling_price="325.75")],
     )
     large = [

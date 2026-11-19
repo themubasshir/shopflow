@@ -48,3 +48,9 @@ export function localizedName(
   if (locale === "bn" && nameBn) return nameBn;
   return nameEn ?? nameBn ?? "";
 }
+
+const quantityFormatter = new Intl.NumberFormat("en-BD", { maximumFractionDigits: 3 });
+
+export function formatQuantity(value: string | number): string {
+  return quantityFormatter.format(Number(value));
+}
