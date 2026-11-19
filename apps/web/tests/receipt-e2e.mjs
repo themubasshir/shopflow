@@ -159,7 +159,7 @@ try {
     const scenario = await context.newPage();
     scenario.on("pageerror", (error) => browserErrors.push(error.message));
     await scenario.goto(origin + "/" + locale + "/invoices/" + rich.id);
-    await scenario.locator("select").selectOption(language);
+    await scenario.locator("#receipt-language").selectOption(language);
     const receipt = scenario.frameLocator("iframe[title]");
     await receipt.getByText(heading, { exact: true }).waitFor();
     await receipt.locator(".item").last().waitFor();

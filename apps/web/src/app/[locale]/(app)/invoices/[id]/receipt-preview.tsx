@@ -91,9 +91,9 @@ export function ReceiptPreview({ id, number, initialLanguage }: {
           </div>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="grid w-full gap-1 text-sm font-medium sm:w-44">
+          <label className="grid w-full gap-1 text-sm font-medium sm:w-44" htmlFor="receipt-language">
             {t("language")}
-            <select className={fieldClass} value={language} onChange={(event) => {
+            <select id="receipt-language" className={fieldClass} value={language} onChange={(event) => {
               const selected = event.target.value as ReceiptLanguage;
               if (selected === language) return;
               setLanguage(selected);
