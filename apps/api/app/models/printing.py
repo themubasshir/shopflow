@@ -35,6 +35,8 @@ class Printer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     ``token_hash`` is the argon2 hash of the agent credential used to claim its
     jobs — never the raw token. ``config`` holds transport-specific connection
     detail (host/port for ``network``) that only the bound agent may read.
+    ``capabilities`` records what the firmware can do; the agent only implements
+    ESC/POS raster, so a character-only device is refused rather than guessed at.
     """
 
     __tablename__ = "printers"
@@ -46,9 +48,16 @@ class Printer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     transport: Mapped[str] = mapped_column(String(24), nullable=False)
     agent_id: Mapped[str] = mapped_column(String(80), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Free-text hardware identity for the acceptance checklist, e.g. "Epson TM-T82X".
+    device_model: Mapped[str | None] = mapped_column(String(120))
     paper_width_mm: Mapped[int] = mapped_column(Integer, nullable=False, server_default="80")
     dots_width: Mapped[int] = mapped_column(Integer, nullable=False, server_default="576")
     dpi: Mapped[int] = mapped_column(Integer, nullable=False, server_default="203")
+    # 1..8, vendor scale; 4 is the neutral level that reproduces the default
+    # threshold, so an untouched printer rasterizes exactly as before.
+    density: Mapped[int] = mapped_column(Integer, nullable=False, server_default="4")
+    # ESC d n feed after the raster, in 1/8 mm dots.
+    feed_dots: Mapped[int] = mapped_column(Integer, nullable=False, server_default="90")
     has_cutter: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     default_language: Mapped[str] = mapped_column(
@@ -56,12 +65,16 @@ class Printer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     # Per-transport connection config (e.g. {"host": "192.168.0.50", "port": 9100}).
     config: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
+    # e.g. {"raster": true, "character": false}.
+    capabilities: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
 
     __table_args__ = (
         CheckConstraint("transport IN ('network','bluetooth')", name="transport_valid"),
         CheckConstraint("paper_width_mm > 0", name="paper_width_positive"),
         CheckConstraint("dots_width > 0", name="dots_width_positive"),
         CheckConstraint("dpi > 0", name="dpi_positive"),
+        CheckConstraint("density BETWEEN 1 AND 8", name="density_range"),
+        CheckConstraint("feed_dots BETWEEN 0 AND 255", name="feed_dots_range"),
         CheckConstraint(
             "default_language IN ('en','bn','bilingual')", name="default_language_valid"
         ),
@@ -154,6 +167,8 @@ class PrintJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # later printer-config change cannot silently alter an in-flight job.
     dots_width: Mapped[int] = mapped_column(Integer, nullable=False, server_default="576")
     dpi: Mapped[int] = mapped_column(Integer, nullable=False, server_default="203")
+    density: Mapped[int] = mapped_column(Integer, nullable=False, server_default="4")
+    feed_dots: Mapped[int] = mapped_column(Integer, nullable=False, server_default="90")
     meta: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
 
     __table_args__ = (
@@ -171,6 +186,8 @@ class PrintJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="status_valid",
         ),
         CheckConstraint("attempts >= 0", name="attempts_non_negative"),
+        CheckConstraint("density BETWEEN 1 AND 8", name="density_range"),
+        CheckConstraint("feed_dots BETWEEN 0 AND 255", name="feed_dots_range"),
         Index("ix_print_jobs_printer_id_status", "printer_id", "status"),
         Index("ix_print_jobs_shop_id_created_at", "shop_id", "created_at"),
         Index("ix_print_jobs_invoice_id", "invoice_id"),

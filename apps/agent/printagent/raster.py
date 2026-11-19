@@ -39,6 +39,22 @@ DEFAULT_THRESHOLD = 160
 # receipts.
 RASTER_CHUNK = 400
 
+# Neutral print-density level. Level 4 maps to DEFAULT_THRESHOLD, so a printer
+# that never sets a density produces exactly the bytes it produced before the
+# setting existed.
+NEUTRAL_DENSITY = 4
+
+
+def density_threshold(density: int) -> int:
+    """Map the 1..8 print-density level onto the 1-bit burn threshold.
+
+    Lower levels lighten (a higher threshold keeps fewer pixels), higher levels
+    darken. The result is clamped so a mis-set level can never produce an
+    unreadable or blank receipt.
+    """
+    level = min(8, max(1, int(density)))
+    return max(80, min(200, DEFAULT_THRESHOLD - (level - NEUTRAL_DENSITY) * 12))
+
 
 @dataclass(frozen=True)
 class RasterPage:
@@ -178,8 +194,9 @@ def pdf_to_escpos(
     *,
     has_cutter: bool,
     threshold: int = DEFAULT_THRESHOLD,
+    feed_dots: int = 90,
 ) -> bytes:
     """Convenience: PDF → calibrated raster → ESC/POS byte stream."""
     page = pdf_to_raster(pdf_bytes, dots_width, threshold=threshold)
-    return escpos_raster_stream(page, has_cutter=has_cutter)
+    return escpos_raster_stream(page, has_cutter=has_cutter, feed_dots=feed_dots)
 

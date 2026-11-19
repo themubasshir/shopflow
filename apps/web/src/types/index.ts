@@ -239,17 +239,33 @@ export type PrintJobStatus =
   | "uncertain"
   | "cancelled";
 
+export interface PrinterCapabilities {
+  raster: boolean;
+  character: boolean;
+}
+
+export interface PrinterConnection {
+  host?: string;
+  port?: number;
+  gateway_id?: string;
+  device_address?: string | null;
+}
+
 export interface PrinterOut {
   id: string;
   name: string;
   transport: "network" | "bluetooth";
   agent_id: string;
+  device_model: string | null;
   paper_width_mm: number;
   dots_width: number;
   dpi: number;
+  density: number;
+  feed_dots: number;
   has_cutter: boolean;
   is_enabled: boolean;
   default_language: ReceiptLang;
+  capabilities: PrinterCapabilities | null;
   counter_ids: string[];
 }
 
@@ -257,26 +273,34 @@ export interface PrinterCreate {
   name: string;
   transport: "network" | "bluetooth";
   agent_id: string;
+  device_model?: string | null;
   paper_width_mm?: number;
   dots_width?: number;
   dpi?: number;
+  density?: number;
+  feed_dots?: number;
   has_cutter?: boolean;
   is_enabled?: boolean;
   default_language?: ReceiptLang;
-  config?: { host?: string; port?: number } | null;
+  capabilities?: PrinterCapabilities;
+  config?: PrinterConnection | null;
 }
 
 export interface PrinterUpdate {
   name?: string;
   transport?: "network" | "bluetooth";
   agent_id?: string;
+  device_model?: string | null;
   paper_width_mm?: number;
   dots_width?: number;
   dpi?: number;
+  density?: number;
+  feed_dots?: number;
   has_cutter?: boolean;
   is_enabled?: boolean;
   default_language?: ReceiptLang;
-  config?: { host?: string; port?: number } | null;
+  capabilities?: PrinterCapabilities;
+  config?: PrinterConnection | null;
 }
 
 export interface PrinterRegistered {

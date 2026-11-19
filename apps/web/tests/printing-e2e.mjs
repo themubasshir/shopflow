@@ -116,8 +116,11 @@ try {
     await dialog.waitFor();
     await dialog.locator("#pf-name").fill(fixtures.second_printer_name);
     await dialog.locator("#pf-agent").fill(fixtures.second_agent_id);
+    await dialog.locator("#pf-model").fill("Epson TM-T82X");
     await dialog.locator("#pf-host").fill("192.168.0.61");
     await dialog.locator("#pf-port").fill("9100");
+    await dialog.locator("#pf-density").fill("6");
+    await dialog.locator("#pf-feed").fill("120");
     await dialog.locator("#pf-lang").selectOption("bn");
     const created = page.waitForResponse(
       (response) =>
@@ -133,7 +136,13 @@ try {
     await button(page, t.done).click();
     await page.reload();
     await printerCard(page, fixtures.second_printer_name).waitFor();
-    step("second printer registered, one-time token shown");
+    // The card's detail list starts with the agent id; assert on the whole list
+    // so a new row order cannot silently turn this into a vacuous check.
+    const details = await printerCard(page, fixtures.second_printer_name).locator("dl").textContent();
+    assert.ok(details?.includes("Epson TM-T82X"), "hardware row must show the model");
+    assert.ok(details?.includes("6/8"), "hardware row must show the density");
+    assert.ok(details?.includes("120"), "hardware row must show the feed distance");
+    step("second printer registered with its hardware profile, one-time token shown");
 
     // Calibration page for the shared printer: a queue job with no invoice.
     const testQueued = page.waitForResponse(

@@ -20,18 +20,36 @@ PrintJobStatus = Literal[
 # --- Printer management ------------------------------------------------------
 
 
+class PrinterCapabilities(BaseModel):
+    """What the device's firmware can do.
+
+    Only ``raster`` is implemented: the agent rasterizes the canonical PDF and
+    sends ``GS v 0`` bitmaps, so Bengali shaping never depends on printer
+    firmware. ``character`` is recorded for inventory purposes but is not used.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    raster: bool = True
+    character: bool = False
+
+
 class PrinterCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str = Field(min_length=1, max_length=120)
     transport: PrinterTransport = "network"
     agent_id: str = Field(min_length=1, max_length=80)
+    device_model: str | None = Field(default=None, max_length=120)
     paper_width_mm: int = Field(default=80, gt=0, le=210)
     dots_width: int = Field(default=576, gt=0, le=2048)
     dpi: int = Field(default=203, gt=0, le=1200)
+    density: int = Field(default=4, ge=1, le=8)
+    feed_dots: int = Field(default=90, ge=0, le=255)
     has_cutter: bool = True
     is_enabled: bool = True
     default_language: ReceiptLanguage = "bilingual"
+    capabilities: PrinterCapabilities = PrinterCapabilities()
     # Transport-specific connection detail only the bound agent may read.
     config: dict | None = None
 
@@ -42,12 +60,16 @@ class PrinterUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     transport: PrinterTransport | None = None
     agent_id: str | None = Field(default=None, min_length=1, max_length=80)
+    device_model: str | None = Field(default=None, max_length=120)
     paper_width_mm: int | None = Field(default=None, gt=0, le=210)
     dots_width: int | None = Field(default=None, gt=0, le=2048)
     dpi: int | None = Field(default=None, gt=0, le=1200)
+    density: int | None = Field(default=None, ge=1, le=8)
+    feed_dots: int | None = Field(default=None, ge=0, le=255)
     has_cutter: bool | None = None
     is_enabled: bool | None = None
     default_language: ReceiptLanguage | None = None
+    capabilities: PrinterCapabilities | None = None
     config: dict | None = None
 
 
@@ -56,12 +78,16 @@ class PrinterOut(ORMModel):
     name: str
     transport: str
     agent_id: str
+    device_model: str | None = None
     paper_width_mm: int
     dots_width: int
     dpi: int
+    density: int
+    feed_dots: int
     has_cutter: bool
     is_enabled: bool
     default_language: str
+    capabilities: dict | None = None
     # config and token are write-only to owners; never echoed back.
     counter_ids: list[UUID] = []
 
@@ -134,6 +160,8 @@ class ClaimedJob(ORMModel):
     lease_seconds: int
     dots_width: int
     dpi: int
+    density: int
+    feed_dots: int
     paper_width_mm: int
     has_cutter: bool
 

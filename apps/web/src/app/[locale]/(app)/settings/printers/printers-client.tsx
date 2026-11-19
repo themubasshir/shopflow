@@ -22,6 +22,7 @@ import { localizedName } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type {
   CounterOut,
+  PrinterConnection,
   PrinterCreate,
   PrinterOut,
   PrinterUpdate,
@@ -177,6 +178,13 @@ export function PrintersClient({
                   <dt className="text-[var(--color-muted-foreground)]">{t("agentId")}</dt>
                   <dd className="min-w-0 break-all text-right font-mono font-medium">
                     {p.agent_id}
+                  </dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-x-3">
+                  <dt className="text-[var(--color-muted-foreground)]">{t("hardware")}</dt>
+                  <dd className="min-w-0 text-right">
+                    {p.device_model ?? t("modelUnknown")} · {p.density}/8 ·{" "}
+                    {t("feedDots", { dots: p.feed_dots })}
                   </dd>
                 </div>
                 <div className="flex flex-wrap justify-between gap-x-3">
@@ -382,20 +390,32 @@ function PrinterForm({
       const n = Number(value(key));
       return Number.isFinite(n) && n > 0 ? n : undefined;
     };
+    const count = (key: string) => {
+      const n = Number(value(key));
+      return value(key) !== "" && Number.isFinite(n) && n >= 0 ? n : undefined;
+    };
     setSubmitting(true);
     setErr(null);
     try {
-      const config =
-        value("host") || value("port")
-          ? {
-              host: value("host") || undefined,
-              port: num("port") ?? 9100,
-            }
-          : null;
+      const transport = value("transport") as PrinterCreate["transport"];
+      const config: PrinterConnection =
+        transport === "network"
+          ? { host: value("host"), port: num("port") ?? 9100 }
+          : { gateway_id: value("gateway_id"), device_address: value("device_address") || null };
+      const capabilities = {
+        raster: true,
+        character: data.get("capability_character") === "on",
+      };
+      const hardware = {
+        device_model: value("device_model") || null,
+        density: num("density"),
+        feed_dots: count("feed_dots"),
+        capabilities,
+      };
       if (isEdit) {
         const body: PrinterUpdate = {
           name: value("name"),
-          transport: value("transport") as PrinterUpdate["transport"],
+          transport,
           agent_id: value("agent_id"),
           paper_width_mm: num("paper_width_mm"),
           dots_width: num("dots_width"),
@@ -403,8 +423,13 @@ function PrinterForm({
           has_cutter: data.get("has_cutter") === "on",
           is_enabled: data.get("is_enabled") === "on",
           default_language: value("default_language") as PrinterUpdate["default_language"],
-          config,
+          ...hardware,
         };
+        // Connection detail is write-only, so only send it when the owner
+        // retypes it; otherwise the stored LAN/gateway config is kept.
+        if (transport === "network" ? value("host") : value("gateway_id")) {
+          body.config = config;
+        }
         const res = await fetch(`/api/printing/printers/${printer!.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -418,7 +443,7 @@ function PrinterForm({
       } else {
         const body: PrinterCreate = {
           name: value("name"),
-          transport: value("transport") as PrinterCreate["transport"],
+          transport,
           agent_id: value("agent_id"),
           paper_width_mm: num("paper_width_mm"),
           dots_width: num("dots_width"),
@@ -427,6 +452,7 @@ function PrinterForm({
           is_enabled: data.get("is_enabled") === "on",
           default_language: value("default_language") as PrinterCreate["default_language"],
           config,
+          ...hardware,
         };
         const res = await fetch("/api/printing/printers", {
           method: "POST",
@@ -462,6 +488,18 @@ function PrinterForm({
             name="name"
             required
             defaultValue={printer?.name ?? ""}
+            className={fieldClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold" htmlFor="pf-model">
+            {t("fields.model")}
+          </label>
+          <input
+            id="pf-model"
+            name="device_model"
+            placeholder="Epson TM-T82X"
+            defaultValue={printer?.device_model ?? ""}
             className={fieldClass}
           />
         </div>
@@ -539,6 +577,36 @@ function PrinterForm({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
+            <label className="mb-1 block text-xs font-semibold" htmlFor="pf-density">
+              {t("fields.density")}
+            </label>
+            <input
+              id="pf-density"
+              name="density"
+              type="number"
+              min={1}
+              max={8}
+              defaultValue={printer?.density ?? 4}
+              className={fieldClass}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold" htmlFor="pf-feed">
+              {t("fields.feed")}
+            </label>
+            <input
+              id="pf-feed"
+              name="feed_dots"
+              type="number"
+              min={0}
+              max={255}
+              defaultValue={printer?.feed_dots ?? 90}
+              className={fieldClass}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
             <label className="mb-1 block text-xs font-semibold" htmlFor="pf-host">
               {t("fields.host")}
             </label>
@@ -566,6 +634,33 @@ function PrinterForm({
             />
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold" htmlFor="pf-gateway">
+              {t("fields.gateway")}
+            </label>
+            <input
+              id="pf-gateway"
+              name="gateway_id"
+              placeholder={t("fields.gatewayHint")}
+              defaultValue={(printer as unknown as PrinterCreate)?.config?.gateway_id ?? ""}
+              className={fieldClass}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold" htmlFor="pf-address">
+              {t("fields.address")}
+            </label>
+            <input
+              id="pf-address"
+              name="device_address"
+              placeholder="00:11:22:33:44:55"
+              defaultValue={(printer as unknown as PrinterCreate)?.config?.device_address ?? ""}
+              className={fieldClass}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-[var(--color-muted-foreground)]">{t("bluetoothNotice")}</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-xs font-semibold" htmlFor="pf-lang">
@@ -602,6 +697,27 @@ function PrinterForm({
               {t("fields.enabled")}
             </label>
           </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-4 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
+          <span className="text-xs font-semibold">{t("fields.capabilities")}</span>
+          <label className="flex items-center gap-2 font-medium">
+            <input
+              type="checkbox"
+              defaultChecked
+              disabled
+              className="h-4 w-4 accent-[var(--color-primary)]"
+            />
+            {t("fields.raster")}
+          </label>
+          <label className="flex items-center gap-2 font-medium">
+            <input
+              type="checkbox"
+              name="capability_character"
+              defaultChecked={printer?.capabilities?.character ?? false}
+              className="h-4 w-4 accent-[var(--color-primary)]"
+            />
+            {t("fields.character")}
+          </label>
         </div>
         {err ? (
           <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">

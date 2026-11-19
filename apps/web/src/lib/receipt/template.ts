@@ -26,6 +26,13 @@ function bilingual(en: string | null | undefined, bn: string | null | undefined,
   return html((language === "bn" ? bn || en : en || bn) ?? "");
 }
 
+// Secondary detail (a masked phone, a counter code) belongs on its own line.
+// Appending it inline after a block-level translation leaves the separator
+// dangling at the start of a line, which reads like a truncated value.
+function detail(value: string, meta: string | null | undefined) {
+  return meta ? `${value}<span class="sub">${meta}</span>` : value;
+}
+
 function formatMoney(amount: string, currency: string) {
   const [whole, fraction = ""] = amount.split(".");
   const sign = whole.startsWith("-") ? "-" : "";
@@ -67,6 +74,9 @@ export async function receiptHtml(receipt: InvoiceReceipt, language: ReceiptLang
   const shopName = bilingual(brand?.shop_name_en, brand?.shop_name_bn, language);
   const customerName = bilingual(id.customer_name, id.customer_name_bn, language);
   const counter = bilingual(id.counter_name_en, id.counter_name_bn, language);
+  const customer = id.customer_phone_masked
+    ? detail(customerName || "", html(id.customer_phone_masked))
+    : customerName;
   const footer = bilingual(brand?.footer_en, brand?.footer_bn, language);
   const returns = bilingual(brand?.return_policy_en, brand?.return_policy_bn, language);
   const pageLanguage = language === "bn" ? "bn" : "en";
@@ -112,7 +122,15 @@ strong,.name{font-weight:700}
 .rule{border-top:.25mm dashed #000;margin-top:2mm;padding-top:1.6mm}
 .terminal{border-top:.35mm solid #000;padding-top:1.2mm}
 .pair,.line,.column-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1.5mm;align-items:baseline}
-.pair>:last-child{text-align:right;max-width:43mm}
+/* Label/value rows: the label takes only the width its own text needs (capped at
+   just over half the row) and the value grows into every remaining millimetre.
+   A greedy full-width label track plus a capped value box is what squeezed
+   bilingual values into a narrow right-aligned column; a value that keeps its
+   max-content width instead starves the label, which is the same bug mirrored. */
+.pair{display:flex;gap:1.5mm;align-items:baseline}
+.pair>dt{flex:0 0 auto;max-width:52%}
+.pair>:last-child{flex:1 1 0;min-width:0;text-align:right}
+.sub{display:block;font-size:2.8mm}
 .number dd,.quantity{font-variant-numeric:tabular-nums lining-nums;white-space:nowrap;max-width:none}
 .item{padding:.9mm 0 1.15mm;break-inside:avoid}
 .column-head{font-weight:740;border-bottom:.25mm solid #000;padding-bottom:.8mm}
@@ -146,7 +164,7 @@ footer p+p{margin-top:1.5mm}
   ${optional("voided_at", receipt.voided_at ? html(timestamp(receipt.voided_at, id.timezone, language)) : null)}
   ${optional("counter", [id.counter_code && html(id.counter_code), counter].filter(Boolean).join(" · "))}
   ${optional("cashier", id.cashier && html(id.cashier))}
-  ${optional("customer", [customerName, id.customer_phone_masked && html(id.customer_phone_masked)].filter(Boolean).join(" · "))}
+  ${optional("customer", customer)}
 </dl>
 <section class="rule">
   <div class="column-head"><span>${label("items")}</span><span>${label("amount")}</span></div>

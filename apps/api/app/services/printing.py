@@ -90,12 +90,16 @@ def _printer_out(db: Session, printer: Printer) -> PrinterOut:
         name=printer.name,
         transport=printer.transport,
         agent_id=printer.agent_id,
+        device_model=printer.device_model,
         paper_width_mm=printer.paper_width_mm,
         dots_width=printer.dots_width,
         dpi=printer.dpi,
+        density=printer.density,
+        feed_dots=printer.feed_dots,
         has_cutter=printer.has_cutter,
         is_enabled=printer.is_enabled,
         default_language=printer.default_language,
+        capabilities=printer.capabilities,
         counter_ids=list(counter_ids),
     )
 
@@ -142,6 +146,57 @@ def _new_agent_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def _connection(transport: str, config: dict | None) -> dict:
+    """Validate transport detail so an agent never receives a half-configured device.
+
+    Only the fields the transport actually uses are stored: a stale Bluetooth
+    address left over from a transport switch must not travel to the agent.
+    """
+    if transport == "network":
+        host = str((config or {}).get("host") or "").strip()
+        if not host:
+            raise ValidationError(
+                "A network printer needs a LAN host", details={"field": "config.host"}
+            )
+        raw_port = (config or {}).get("port", 9100)
+        try:
+            port = int(raw_port)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(
+                "Port must be a whole number", details={"field": "config.port"}
+            ) from exc
+        if not 1 <= port <= 65535:
+            raise ValidationError(
+                "Port must be between 1 and 65535", details={"field": "config.port"}
+            )
+        return {"host": host, "port": port}
+
+    gateway = str((config or {}).get("gateway_id") or "").strip()
+    if not gateway:
+        raise ValidationError(
+            "A Bluetooth printer needs a gateway identifier",
+            details={"field": "config.gateway_id"},
+        )
+    address = str((config or {}).get("device_address") or "").strip() or None
+    return {"gateway_id": gateway, "device_address": address}
+
+
+def _capabilities(value: object) -> dict:
+    """Store the capability flags, refusing a device the agent cannot drive.
+
+    The agent only emits ESC/POS raster bitmaps (``GS v 0``). A character-only
+    device would silently drop Bengali shaping, so it is rejected at the door
+    instead of failing on the shop floor.
+    """
+    caps = value.model_dump() if hasattr(value, "model_dump") else dict(value or {})  # type: ignore[arg-type]
+    if not caps.get("raster", True):
+        raise ValidationError(
+            "This print agent only sends ESC/POS raster bitmaps",
+            details={"field": "capabilities.raster"},
+        )
+    return {"raster": True, "character": bool(caps.get("character", False))}
+
+
 # ---------------------------------------------------------------------------
 # Owner: printer management
 # ---------------------------------------------------------------------------
@@ -173,13 +228,17 @@ def create_printer(db: Session, principal: Principal, body) -> tuple[PrinterOut,
         transport=body.transport,
         agent_id=body.agent_id,
         token_hash=hash_password(token),
+        device_model=body.device_model,
         paper_width_mm=body.paper_width_mm,
         dots_width=body.dots_width,
         dpi=body.dpi,
+        density=body.density,
+        feed_dots=body.feed_dots,
         has_cutter=body.has_cutter,
         is_enabled=body.is_enabled,
         default_language=body.default_language,
-        config=body.config,
+        config=_connection(body.transport, body.config),
+        capabilities=_capabilities(body.capabilities),
     )
     db.add(printer)
     db.flush()
@@ -192,6 +251,13 @@ def update_printer(db: Session, principal: Principal, printer_id: uuid.UUID, bod
     _require_owner(principal)
     printer = _shop_printer(db, principal.shop_id, printer_id)
     changes = body.model_dump(exclude_unset=True)
+    if "transport" in changes or "config" in changes:
+        changes["config"] = _connection(
+            changes.get("transport", printer.transport),
+            changes.get("config", printer.config),
+        )
+    if "capabilities" in changes:
+        changes["capabilities"] = _capabilities(changes["capabilities"])
     for field, value in changes.items():
         setattr(printer, field, value)
     _audit(
@@ -329,6 +395,8 @@ def enqueue_print(
         reprint_of_job_id=reprint_of_job_id,
         dots_width=printer.dots_width,
         dpi=printer.dpi,
+        density=printer.density,
+        feed_dots=printer.feed_dots,
         meta={"invoice_number": invoice.invoice_number},
     )
     db.add(job)
@@ -564,6 +632,8 @@ def claimed_job_view(
         lease_seconds=LEASE_SECONDS,
         dots_width=job.dots_width,
         dpi=job.dpi,
+        density=job.density,
+        feed_dots=job.feed_dots,
         paper_width_mm=printer.paper_width_mm if printer else 80,
         has_cutter=printer.has_cutter if printer else False,
     )
@@ -651,6 +721,8 @@ def enqueue_test_page(
         status="pending",
         dots_width=printer.dots_width,
         dpi=printer.dpi,
+        density=printer.density,
+        feed_dots=printer.feed_dots,
         meta={"printer_name": printer.name},
     )
     db.add(job)

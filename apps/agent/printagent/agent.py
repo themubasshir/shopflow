@@ -25,7 +25,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
-from .raster import pdf_to_escpos
+from .raster import NEUTRAL_DENSITY, density_threshold, pdf_to_escpos
 from .transport import PrinterTransport, TransportError, transport_for
 
 
@@ -191,8 +191,14 @@ class PrintAgent:
         )
         pdf = self.http.fetch_bytes(doc["render_url"])
         # 3. Rasterize to the printer's calibrated width and stream ESC/POS.
+        #    Density and feed distance travel with the job snapshot, so editing
+        #    the printer later cannot change a receipt that is already queued.
         stream = pdf_to_escpos(
-            pdf, int(job["dots_width"]), has_cutter=bool(job["has_cutter"])
+            pdf,
+            int(job["dots_width"]),
+            has_cutter=bool(job["has_cutter"]),
+            threshold=density_threshold(int(job.get("density", NEUTRAL_DENSITY))),
+            feed_dots=int(job.get("feed_dots", 90)),
         )
         self._transport().send(stream, self._printer_config)
         # 4. Confirm the physical print completed.

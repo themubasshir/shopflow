@@ -1,10 +1,11 @@
-"""Run the receipt browser suite with local servers and the dedicated shopflow_test DB."""
+﻿"""Run the receipt browser suite with local servers and the dedicated shopflow_test DB."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -113,7 +114,9 @@ def fixtures(db: Session):
             stock_on_hand=15,
             units=[ProductUnit(name="pack", name_bn="প্যাক", is_base=True, selling_price="85.25")],
         )
-        for number in range(1, 81)
+        # Long enough that the bilingual receipt exceeds one PDF sheet, so the
+        # multi-sheet split and its stitching are exercised, not just a tall page.
+        for number in range(1, 201)
     ]
     customer = Customer(
         shop_id=shop.id,
@@ -172,6 +175,129 @@ def wait_ready(url, process, log):
         except (URLError, OSError):
             time.sleep(0.3)
     raise RuntimeError(f"Receipt test server did not start. See {log}.")
+
+
+def check_pdf_margins(pdf_dir: Path) -> None:
+    """Fail if any receipt text reaches past the printable width or a sheet is half empty.
+
+    The body is 72 mm inside an 80 mm page (4 mm gutters). A span that touches
+    the paper edge means the layout overflowed and the printer will cut the
+    glyph, so this is the automated guard against the bilingual clipping
+    regression.
+
+    The vertical check catches a different, silent failure: a long receipt is
+    split across several PDF sheets, and cropping a sheet from the wrong edge
+    drops whole rows while still producing a plausible-looking document. A
+    sheet that ends with a large blank tail is that signature (the last sheet is
+    trimmed to the real content height, so it must end near its own bottom).
+
+    PyMuPDF comes with the print-agent dependency set; when it is missing the
+    check is skipped rather than silently passing.
+    """
+    try:
+        import pymupdf
+    except ImportError:  # pragma: no cover - depends on the local environment
+        print("PDF margins: skipped (pymupdf is not installed)")
+        return
+
+    gutter_mm = 4.0
+    tolerance_mm = 0.35
+    # A page break can leave one un-splittable row's height empty; anything
+    # larger than this means content was lost rather than deferred.
+    max_blank_tail_mm = 60.0
+    files = sorted(pdf_dir.glob("*.pdf"))
+    if not files:
+        raise SystemExit(f"No receipt PDFs found in {pdf_dir} to check.")
+    widest = 0.0
+    spans = 0
+    sheets = 0
+    for path in files:
+        with pymupdf.open(path) as doc:
+            for index, page in enumerate(doc, start=1):
+                width_mm = page.rect.width * 25.4 / 72
+                height_mm = page.rect.height * 25.4 / 72
+                left_limit = gutter_mm - tolerance_mm
+                right_limit = width_mm - gutter_mm + tolerance_mm
+                lowest = 0.0
+                for block in page.get_text("dict")["blocks"]:
+                    for line in block.get("lines", []):
+                        lowest = max(lowest, line["bbox"][3] * 25.4 / 72)
+                        for span in line["spans"]:
+                            x0 = span["bbox"][0] * 25.4 / 72
+                            x1 = span["bbox"][2] * 25.4 / 72
+                            if x0 < left_limit or x1 > right_limit:
+                                raise SystemExit(
+                                    f"{path.name} page {index}: {span['text']!r} spans "
+                                    f"{x0:.2f}-{x1:.2f} mm, outside the printable "
+                                    f"{gutter_mm:.0f}-{width_mm - gutter_mm:.2f} mm"
+                                )
+                            widest = max(widest, x1)
+                            spans += 1
+                blank_tail = height_mm - lowest
+                if blank_tail > max_blank_tail_mm:
+                    raise SystemExit(
+                        f"{path.name} page {index}: content stops {blank_tail:.0f} mm "
+                        f"above the bottom of a {height_mm:.0f} mm sheet — rows were "
+                        "dropped when the receipt was split"
+                    )
+                sheets += 1
+    print(
+        f"PDF layout: {spans} spans across {sheets} sheet(s) in {len(files)} receipts stay "
+        f"inside the printable width (max x1 {widest:.2f} mm) and fill every sheet."
+    )
+
+
+def check_long_receipt(pdf_dir: Path, expected_items: int) -> None:
+    """Fail if a split receipt lost rows or left half a sheet blank.
+
+    A receipt taller than one PDF sheet is split, and the last sheet is trimmed
+    to the real content height. Cropping such a sheet from the wrong edge drops
+    whole rows while still producing a plausible document, so this asserts every
+    line item is present exactly once and that no sheet ends in a large blank.
+    """
+    try:
+        import pymupdf
+    except ImportError:  # pragma: no cover - depends on the local environment
+        print("Long receipt: skipped (pymupdf is not installed)")
+        return
+
+    path = pdf_dir / "shopflow-receipt-bilingual-long.pdf"
+    if not path.exists():
+        raise SystemExit(f"Missing the long receipt PDF at {path}.")
+    mm = 25.4 / 72
+    max_blank_tail_mm = 60.0
+    seen: dict[int, int] = {}
+    with pymupdf.open(path) as doc:
+        for index, page in enumerate(doc, start=1):
+            lowest = 0.0
+            for block in page.get_text("dict")["blocks"]:
+                for line in block.get("lines", []):
+                    lowest = max(lowest, line["bbox"][3] * mm)
+                    for span in line["spans"]:
+                        match = re.search(r"Thermal sample (\d+)", span["text"])
+                        if match:
+                            number = int(match.group(1))
+                            seen[number] = seen.get(number, 0) + 1
+            blank_tail = page.rect.height * mm - lowest
+            if blank_tail > max_blank_tail_mm:
+                raise SystemExit(
+                    f"{path.name} page {index}: content stops {blank_tail:.0f} mm above "
+                    "the bottom of the sheet — rows were dropped when it was split"
+                )
+        sheets = doc.page_count
+    missing = [n for n in range(1, expected_items + 1) if n not in seen]
+    duplicated = sorted(n for n, count in seen.items() if count > 1)
+    if missing or duplicated:
+        raise SystemExit(
+            f"{path.name}: {len(missing)} of {expected_items} line items missing "
+            f"(first: {missing[:5]}), duplicated: {duplicated[:5]}"
+        )
+    if sheets < 2:
+        raise SystemExit(f"{path.name}: expected a split receipt, got {sheets} sheet(s)")
+    print(
+        f"Long receipt: {expected_items} line items across {sheets} sheets, every item "
+        "present exactly once and every sheet filled."
+    )
 
 
 def main() -> None:
@@ -265,6 +391,8 @@ def main() -> None:
             cwd=WEB,
             check=True,
         )
+        check_pdf_margins(args.pdfs)
+        check_long_receipt(args.pdfs, len(data["large"]))
 
 
 if __name__ == "__main__":

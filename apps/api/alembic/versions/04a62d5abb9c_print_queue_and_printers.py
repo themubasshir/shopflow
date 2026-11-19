@@ -71,9 +71,7 @@ def upgrade() -> None:
             "transport IN ('network','bluetooth')",
             name=op.f("ck_printers_transport_valid"),
         ),
-        sa.CheckConstraint(
-            "paper_width_mm > 0", name=op.f("ck_printers_paper_width_positive")
-        ),
+        sa.CheckConstraint("paper_width_mm > 0", name=op.f("ck_printers_paper_width_positive")),
         sa.CheckConstraint("dots_width > 0", name=op.f("ck_printers_dots_width_positive")),
         sa.CheckConstraint("dpi > 0", name=op.f("ck_printers_dpi_positive")),
         sa.CheckConstraint(

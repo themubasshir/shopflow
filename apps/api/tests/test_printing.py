@@ -25,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import Principal
-from app.core.errors import AuthenticationError, ConflictError
+from app.core.errors import AuthenticationError, ConflictError, ValidationError
 from app.core.permissions import ALL_PERMISSIONS
 from app.core.security import hash_password
 from app.db.session import SessionLocal
@@ -41,7 +41,7 @@ from app.models import (
     Shop,
     User,
 )
-from app.schemas.printing import PrinterCreate, PrinterOut
+from app.schemas.printing import PrinterCapabilities, PrinterCreate, PrinterOut, PrinterUpdate
 from app.services import printing as svc
 from fixtures import post_opening_stock
 
@@ -50,7 +50,12 @@ if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
 
 from printagent.agent import AgentConfig, PrintAgent  # noqa: E402
-from printagent.raster import pdf_to_escpos, pdf_to_raster  # noqa: E402
+from printagent.raster import (  # noqa: E402
+    DEFAULT_THRESHOLD,
+    density_threshold,
+    pdf_to_escpos,
+    pdf_to_raster,
+)
 from printagent.transport import NetworkTransport, SimulatedPrinter, TransportError  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -206,7 +211,14 @@ def test_create_printer_returns_one_time_token(print_shop):
     with SessionLocal() as db:
         owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
         out, token = svc.create_printer(
-            db, owner, PrinterCreate(name="Second", agent_id="agent-2", transport="network")
+            db,
+            owner,
+            PrinterCreate(
+                name="Second",
+                agent_id="agent-2",
+                transport="network",
+                config={"host": "192.168.0.60", "port": 9100},
+            ),
         )
         assert out.agent_id == "agent-2"
         assert token and len(token) > 30  # shown once, never stored
@@ -361,7 +373,14 @@ def test_agent_scoped_to_own_printer(print_shop):
         owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
         other_agent = "agent9-" + uuid.uuid4().hex[:8]
         other, _tok = svc.create_printer(
-            db, owner, PrinterCreate(name="Other", agent_id=other_agent, transport="network")
+            db,
+            owner,
+            PrinterCreate(
+                name="Other",
+                agent_id=other_agent,
+                transport="network",
+                config={"host": "192.168.0.61", "port": 9100},
+            ),
         )
         # A second agent resolves only to its own printer, never the shared one.
         printer9 = svc.authenticate_agent(db, other_agent, _tok)
@@ -521,6 +540,202 @@ def test_reprint_creates_new_job_referencing_invoice(print_shop):
 
 
 # ---------------------------------------------------------------------------
+# Hardware profile + shared-printer edge cases (Phase 2D-3)
+# ---------------------------------------------------------------------------
+
+
+def test_printer_hardware_profile_round_trips(print_shop):
+    """Model, density, feed distance and capabilities persist and are visible to
+    staff, while the connection detail stays write-only."""
+    ctx = print_shop
+    with SessionLocal() as db:
+        owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
+        out, _token = svc.create_printer(
+            db,
+            owner,
+            PrinterCreate(
+                name="Epson front desk",
+                agent_id="agent-hw-" + uuid.uuid4().hex[:6],
+                transport="network",
+                device_model="Epson TM-T82X",
+                density=6,
+                feed_dots=120,
+                capabilities=PrinterCapabilities(character=True),
+                config={"host": "192.168.0.51", "port": 9100},
+            ),
+        )
+        assert (out.device_model, out.density, out.feed_dots) == ("Epson TM-T82X", 6, 120)
+        assert out.capabilities == {"raster": True, "character": True}
+        row = db.get(Printer, out.id)
+        assert row.config == {"host": "192.168.0.51", "port": 9100}
+
+
+def test_printer_requires_transport_connection_detail(print_shop):
+    ctx = print_shop
+    with SessionLocal() as db:
+        owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
+        with pytest.raises(ValidationError) as missing_host:
+            svc.create_printer(
+                db,
+                owner,
+                PrinterCreate(name="No host", agent_id="agent-x1", transport="network"),
+            )
+        assert missing_host.value.details["field"] == "config.host"
+        with pytest.raises(ValidationError) as bad_port:
+            svc.create_printer(
+                db,
+                owner,
+                PrinterCreate(
+                    name="Bad port",
+                    agent_id="agent-x2",
+                    transport="network",
+                    config={"host": "192.168.0.50", "port": 70000},
+                ),
+            )
+        assert bad_port.value.details["field"] == "config.port"
+
+        # Bluetooth is configurable but the agent refuses to drive it; the
+        # gateway identifier is the minimum a future host needs.
+        with pytest.raises(ValidationError):
+            svc.create_printer(
+                db,
+                owner,
+                PrinterCreate(name="BT", agent_id="agent-x3", transport="bluetooth"),
+            )
+        bluetooth, _token = svc.create_printer(
+            db,
+            owner,
+            PrinterCreate(
+                name="BT front desk",
+                agent_id="agent-bt-" + uuid.uuid4().hex[:6],
+                transport="bluetooth",
+                config={"gateway_id": "front-desk-gateway", "host": "192.168.0.9"},
+            ),
+        )
+        # Only the fields the transport uses are stored.
+        assert db.get(Printer, bluetooth.id).config == {
+            "gateway_id": "front-desk-gateway",
+            "device_address": None,
+        }
+
+
+def test_character_only_printer_is_refused(print_shop):
+    """The agent only emits ESC/POS raster bitmaps; a character-only device
+    would silently lose Bengali shaping, so it cannot be registered."""
+    ctx = print_shop
+    with SessionLocal() as db:
+        owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
+        with pytest.raises(ValidationError) as refused:
+            svc.create_printer(
+                db,
+                owner,
+                PrinterCreate(
+                    name="Character only",
+                    agent_id="agent-chr",
+                    transport="network",
+                    capabilities=PrinterCapabilities(raster=False, character=True),
+                    config={"host": "192.168.0.70", "port": 9100},
+                ),
+            )
+        assert refused.value.details["field"] == "capabilities.raster"
+
+
+def test_update_keeps_connection_detail_when_not_resent(print_shop):
+    ctx = print_shop
+    with SessionLocal() as db:
+        owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
+        renamed = svc.update_printer(db, owner, ctx["printer"].id, PrinterUpdate(name="Renamed"))
+        assert renamed.name == "Renamed"
+        assert db.get(Printer, ctx["printer"].id).config == {
+            "host": "192.168.0.50",
+            "port": 9100,
+        }
+
+
+def test_claim_snapshots_density_and_feed(print_shop):
+    """A queued job keeps the calibration it was created with; editing the
+    printer afterwards must not change an in-flight receipt."""
+    ctx = print_shop
+    with SessionLocal() as db:
+        owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
+        svc.update_printer(db, owner, ctx["printer"].id, PrinterUpdate(density=7, feed_dots=140))
+        svc.enqueue_print(db, owner, _invoice(db, ctx).id, ctx["printer"].id, None)
+        printer = svc.authenticate_agent(db, ctx["agent_id"], ctx["agent_token"])
+        job, token, document = svc.claim_job(db, printer)
+        view = svc.claimed_job_view(db, job, token, document)
+        assert (view.density, view.feed_dots) == (7, 140)
+
+        svc.update_printer(db, owner, ctx["printer"].id, PrinterUpdate(density=2, feed_dots=10))
+        db.refresh(job)
+        assert (job.density, job.feed_dots) == (7, 140)
+
+
+def test_disabled_printer_stops_claiming_and_resumes(print_shop):
+    """Deactivating a printer must stop its agent immediately; queued work stays
+    queued (nothing is silently dropped) and resumes when it is re-enabled."""
+    ctx = print_shop
+    with SessionLocal() as db:
+        owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
+        queued = svc.enqueue_print(db, owner, _invoice(db, ctx).id, ctx["printer"].id, None)
+        svc.update_printer(db, owner, ctx["printer"].id, PrinterUpdate(is_enabled=False))
+        with pytest.raises(AuthenticationError):
+            svc.authenticate_agent(db, ctx["agent_id"], ctx["agent_token"])
+        assert db.get(PrintJob, queued.id).status == "pending"
+
+        svc.update_printer(db, owner, ctx["printer"].id, PrinterUpdate(is_enabled=True))
+        printer = svc.authenticate_agent(db, ctx["agent_id"], ctx["agent_token"])
+        claimed, _token, _document = svc.claim_job(db, printer)
+        assert claimed.id == queued.id
+
+
+def test_reassignment_keeps_queued_jobs_on_their_printer(print_shop):
+    """Moving a counter to another printer only affects future jobs."""
+    ctx = print_shop
+    with SessionLocal() as db:
+        owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
+        second, _token = svc.create_printer(
+            db,
+            owner,
+            PrinterCreate(
+                name="Second",
+                agent_id="agent-re-" + uuid.uuid4().hex[:6],
+                transport="network",
+                config={"host": "192.168.0.52", "port": 9100},
+            ),
+        )
+        svc.assign_counter_printer(db, owner, ctx["c1"].id, ctx["printer"].id)
+        queued = svc.enqueue_print(db, owner, _invoice(db, ctx, ctx["c1"]).id, None, None)
+        assert queued.printer_id == ctx["printer"].id
+
+        svc.assign_counter_printer(db, owner, ctx["c1"].id, second.id)
+        assert db.get(PrintJob, queued.id).printer_id == ctx["printer"].id
+        fresh = svc.enqueue_print(db, owner, _invoice(db, ctx, ctx["c1"]).id, None, None)
+        assert fresh.printer_id == second.id
+
+
+def test_completed_job_is_never_claimed_twice(print_shop):
+    """A finished job leaves the queue for good: the agent gets nothing on the
+    next poll, so a receipt can never print twice from one job."""
+    ctx = print_shop
+    with SessionLocal() as db:
+        owner = _owner_principal(db, db.get(Shop, ctx["shop"].id))
+        queued = svc.enqueue_print(db, owner, _invoice(db, ctx).id, ctx["printer"].id, None)
+        printer = svc.authenticate_agent(db, ctx["agent_id"], ctx["agent_token"])
+        job, token, _document = svc.claim_job(db, printer)
+        svc.complete_job(db, printer, job.id, token)
+
+        again, _t, _d = svc.claim_job(db, printer)
+        assert again is None
+        assert db.get(PrintJob, queued.id).status == "completed"
+        # The only way to print again is a deliberate reprint job.
+        reprint = svc.enqueue_print(
+            db, owner, queued.invoice_id, ctx["printer"].id, None, reprint_of_job_id=queued.id
+        )
+        assert reprint.id != queued.id
+        assert reprint.reprint_of_job_id == queued.id
+
+
+# ---------------------------------------------------------------------------
 # Rasterization + transport (simulated)
 # ---------------------------------------------------------------------------
 
@@ -554,6 +769,37 @@ def test_long_receipt_produces_banded_stream():
     # A ~17k-dot strip is split into many GS v 0 bands.
     assert stream.count(b"\x1dv0") > 20
     assert len(stream) > 1_000_000
+
+
+def test_density_levels_map_to_a_bounded_threshold():
+    """Level 4 must reproduce the pre-existing threshold byte-for-byte, and the
+    other levels must stay inside a range that still burns legible text."""
+    assert density_threshold(4) == DEFAULT_THRESHOLD
+    levels = [density_threshold(level) for level in range(1, 9)]
+    assert levels == sorted(levels, reverse=True)  # darker level → lower threshold
+    assert all(80 <= threshold <= 200 for threshold in levels)
+
+
+def test_density_and_feed_change_the_stream():
+    pdf = _sample_pdf()
+    neutral = pdf_to_escpos(pdf, 576, has_cutter=True, threshold=density_threshold(4))
+    default = pdf_to_escpos(pdf, 576, has_cutter=True)
+    assert neutral == default  # the default job is unchanged by this phase
+
+    lighter = pdf_to_escpos(pdf, 576, has_cutter=True, threshold=density_threshold(2))
+    darker = pdf_to_escpos(pdf, 576, has_cutter=True, threshold=density_threshold(7))
+    assert lighter != neutral
+    assert darker != neutral
+    assert lighter.count(b"\x1dv0") == neutral.count(b"\x1dv0")  # same geometry
+    assert darker.count(b"\x1dv0") == neutral.count(b"\x1dv0")
+
+    # Feed distance only changes the ESC d parameter that precedes the cut.
+    short = pdf_to_escpos(pdf, 576, has_cutter=True, feed_dots=0)
+    long = pdf_to_escpos(pdf, 576, has_cutter=True, feed_dots=200)
+    assert short[:-7] == long[:-7]  # identical raster
+    assert short[-7:-4] == b"\x1bd\x00"
+    assert long[-7:-4] == b"\x1bd\xc8"
+    assert short[-4:] == long[-4:] == b"\x1dVB\x00"  # partial cut, unchanged
 
 
 def test_simulated_transport_records_and_fails():

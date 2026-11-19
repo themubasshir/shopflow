@@ -38,9 +38,9 @@ async function sale(context, body) {
 const receiptUrl = (id, language, format = "html") =>
   origin + "/api/invoices/" + id + "/receipt?lang=" + language + "&format=" + format;
 
-async function inspectPdf(bytes) {
+async function inspectPdf(bytes, expectedPages = 1) {
   const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
-  assert.equal(pdf.getPageCount(), 1);
+  assert.equal(pdf.getPageCount(), expectedPages);
   const { width, height } = pdf.getPage(0).getSize();
   assert.ok(Math.abs(width - expectedWidth) < 0.00001);
   const embedded = pdf.context.enumerateIndirectObjects().some(([, object]) =>
@@ -48,7 +48,7 @@ async function inspectPdf(bytes) {
       && (object.has(PDFName.of("FontFile2")) || object.has(PDFName.of("FontFile3"))),
   );
   assert.ok(embedded, "Expected the Bengali font program in the PDF");
-  return { width, height };
+  return { width, height, pages: pdf.getPageCount() };
 }
 
 async function download(page, buttonName, path) {
@@ -59,6 +59,56 @@ async function download(page, buttonName, path) {
   await file.saveAs(path);
   return readFile(path);
 }
+
+// Receipt layout guard, shared by the live preview and the long-name stress
+// renders. Every label/value row must give the value all the width the label
+// does not need, and nothing may leave the 72 mm body.
+const layoutGuard = (main) => {
+  const problems = [];
+  const box = main.getBoundingClientRect();
+  const round = (value) => Math.round(value * 10) / 10;
+  // Natural (unwrapped) width of a node's own text, measured off-screen.
+  const natural = (node) => {
+    const probe = document.createElement("span");
+    probe.setAttribute("style",
+      "position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap");
+    probe.innerHTML = node.innerHTML;
+    main.appendChild(probe);
+    const width = probe.getBoundingClientRect().width;
+    probe.remove();
+    return width;
+  };
+  for (const row of main.querySelectorAll(".pair")) {
+    const label = row.querySelector("dt");
+    const value = row.lastElementChild;
+    if (!label || !value || label === value) continue;
+    const rowWidth = row.getBoundingClientRect().width;
+    const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+    const labelWidth = label.getBoundingClientRect().width;
+    const valueWidth = value.getBoundingClientRect().width;
+    const free = rowWidth - labelWidth - gap;
+    const labelText = label.textContent.trim().slice(0, 24);
+    // The label gets its own text width, capped at just over half the row, and
+    // its box must be at least that wide. A narrower box means the value starved
+    // the label and it wrapped; a wider one means the label stole value space
+    // (the original defect). Slight overshoot inside a still-capped box is fine.
+    const allowance = Math.min(natural(label), rowWidth * 0.52);
+    if (labelWidth < allowance - 1 || labelWidth > rowWidth * 0.52 + 1) {
+      problems.push({ row: labelText, label: round(labelWidth), needs: round(allowance) });
+    }
+    // The value must own everything the label leaves.
+    if (valueWidth < free - 1) {
+      problems.push({ row: labelText, value: round(valueWidth), free: round(free) });
+    }
+  }
+  for (const node of main.querySelectorAll("*")) {
+    const rect = node.getBoundingClientRect();
+    if (rect.right > box.right + 0.5 || rect.left < box.left - 0.5) {
+      problems.push({ overflow: node.className || node.tagName, left: round(rect.left), right: round(rect.right) });
+    }
+  }
+  return { problems, width: round(box.width) };
+};
 
 async function verifyPrint(page, label) {
   const frame = page.frames().find((child) => child.url().includes("/api/invoices/"));
@@ -165,6 +215,13 @@ try {
     await receipt.locator(".item").last().waitFor();
     assert.equal(await receipt.locator(".item").count(), 2);
     assert.equal(await receipt.locator(".quantity").first().textContent(), "1.25");
+    // Layout guard: the label column must be only as wide as its own text, so the
+    // value column gets every remaining millimetre. The old rule made the label a
+    // greedy `1fr` track and capped the value box at 43 mm, which squeezed
+    // bilingual translations into a narrow right-aligned column where Bengali
+    // wrapped against the paper edge.
+    const layout = await receipt.locator("[data-receipt]").evaluate(layoutGuard);
+    assert.deepEqual(layout.problems, [], "Receipt layout squeezed or overflowing: " + JSON.stringify(layout));
     await verifyPrint(scenario, printLabel);
     assert.deepEqual(await scenario.evaluate(() => [
       document.documentElement.scrollWidth, window.innerWidth,
@@ -179,19 +236,88 @@ try {
     await context.close();
   }
 
-  const large = await sale(owner, {
-    items: data.large.map((product) => ({ product_id: product, quantity: "1" })),
+  // Long-name stress: the real bilingual markup with the counter, cashier and
+  // customer values replaced by realistically long bilingual names. This is the
+  // shape the old layout broke — the value column collapsed to its English
+  // width and the Bengali translation wrapped inside a narrow right-aligned box.
+  const stressMarkup = await (await cashier.request.get(receiptUrl(rich.id, "bilingual"))).text();
+  const stress = await browser.newPage();
+  stress.on("pageerror", (error) => browserErrors.push(error.message));
+  await stress.emulateMedia({ media: "print" });
+  await stress.setContent(stressMarkup, { waitUntil: "load" });
+  await stress.evaluate(() => document.fonts.ready);
+  const stressed = await stress.evaluate(() => {
+    const long = {
+      Counter: [
+        "C1 · Counter 1 · Front desk and wholesale collection point",
+        "কাউন্টার ১ · সামনের ডেস্ক ও পাইকারি সংগ্রহ কেন্দ্র",
+      ],
+      Cashier: ["Jamal Hossain Ahmed Chowdhury", "জামাল হোসেন আহমেদ চৌধুরী"],
+      Customer: ["Amina Rahman Siddiqua Khatun", "আমিনা রহমান সিদ্দিকা খাতুন"],
+    };
+    const applied = [];
+    for (const [label, [english, bangla]] of Object.entries(long)) {
+      const row = [...document.querySelectorAll(".pair")].find((candidate) =>
+        candidate.querySelector("dt")?.textContent.trim().startsWith(label));
+      if (!row) continue;
+      const value = row.querySelector("dd");
+      value.firstChild.textContent = english + " ";
+      const translation = value.querySelector(".translation");
+      if (translation) translation.textContent = bangla;
+      const lineHeight = parseFloat(getComputedStyle(value).lineHeight) || 17;
+      const banglaRects = translation ? [...translation.getClientRects()] : [];
+      applied.push({
+        label,
+        lines: Math.round(value.getBoundingClientRect().height / lineHeight),
+        right: Math.round(value.getBoundingClientRect().right * 10) / 10,
+        banglaRight: banglaRects.length
+          ? Math.round(Math.max(...banglaRects.map((rect) => rect.right)) * 10) / 10
+          : null,
+      });
+    }
+    return { applied, body: document.querySelector("main").getBoundingClientRect().right };
+  });
+  assert.deepEqual(stressed.applied.map((row) => row.label), ["Counter", "Cashier", "Customer"]);
+  for (const row of stressed.applied) {
+    assert.ok(row.right <= stressed.body + 0.5, row.label + " value left the receipt body");
+    assert.ok(row.banglaRight === null || row.banglaRight <= stressed.body + 0.5,
+      row.label + " Bangla value left the receipt body");
+  }
+  assert.ok(stressed.applied[0].lines > 1, "a long counter name must wrap, not be truncated");
+  const stressLayout = await stress.locator("[data-receipt]").evaluate(layoutGuard);
+  assert.deepEqual(stressLayout.problems, [],
+    "Long-name receipt layout squeezed or overflowing: " + JSON.stringify(stressLayout));
+  // Re-fit the print page after the substitution: the stylesheet height was
+  // computed for the original names, so the taller content would spill onto a
+  // second sheet. This mirrors what the PDF route does from the real DOM.
+  await stress.evaluate(() => {
+    const pxPerMm = 96 / 25.4;
+    const content = Math.ceil(document.querySelector("main").getBoundingClientRect().height / pxPerMm) + 2;
+    document.getElementById("print-page").textContent =
+      "@page { size: 80mm " + content + "mm; margin: 0; }";
+  });
+  const stressPdf = await stress.pdf({ preferCSSPageSize: true, displayHeaderFooter: false });
+  await writeFile(join(pdfs, "shopflow-receipt-long-names.pdf"), stressPdf);
+  await stress.close();
+
+  const large = await sale(owner, {    items: data.large.map((product) => ({ product_id: product, quantity: "1" })),
     payments: [{ method: "cash" }],
   });
   const longResponse = await cashier.request.get(receiptUrl(large.id, "bilingual", "pdf"));
   assert.equal(longResponse.status(), 200, await longResponse.text());
   const long = await longResponse.body();
-  const longSize = await inspectPdf(long);
+  // A receipt taller than one sheet must split, not shrink to a fallback height.
+  const sheets = await PDFDocument.load(long, { updateMetadata: false }).then((pdf) => pdf.getPageCount());
+  const longSize = await inspectPdf(long, sheets);
   assert.ok(longSize.height > 1200);
+  assert.ok(sheets >= 2, "an 80-item receipt should already exceed one sheet: " + sheets);
   await writeFile(join(pdfs, "shopflow-receipt-bilingual-long.pdf"), long);
   assert.deepEqual(browserErrors, []);
   console.log("4 viewport workflows passed. Exact 80 mm PDFs, embedded Bengali font, deterministic reprint.");
-  console.log("Long receipt: " + data.large.length + " lines, " + (longSize.height * 25.4 / 72).toFixed(0) + " mm.");
+  console.log(
+    "Long receipt: " + data.large.length + " lines, " + sheets + " sheet(s), " +
+    (longSize.height * 25.4 / 72).toFixed(0) + " mm first sheet.",
+  );
 } finally {
   await browser.close();
 }
