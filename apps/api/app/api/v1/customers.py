@@ -266,6 +266,7 @@ def customer_statement(
                 invoice_id=e.invoice_id,
                 invoice_number=number,
                 payment_id=e.payment_id,
+                return_id=e.return_id,
                 amount=e.amount,
                 balance_after=balance,
                 created_at=e.created_at,

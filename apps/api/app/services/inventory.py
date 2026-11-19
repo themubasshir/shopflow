@@ -69,6 +69,7 @@ def stock_value(db: Session, shop_id: UUID, product_id: UUID) -> StockValue:
     return StockValue(
         product_id=product_id,
         quantity_on_hand=product.stock_on_hand,
+        held_quantity=product.held_quantity,
         available=available,
         ledger_quantity=ledger,
         value=total.quantize(MONEY),

@@ -38,7 +38,7 @@ export function SalesChart({ data, locale }: { data: SalesPoint[]; locale: strin
             tickLine={false}
             axisLine={false}
             tickFormatter={(v: number) => `৳${Math.round(v / 100) * 100}`}
-            width={48}
+            width={72}
           />
           <Tooltip
             formatter={(value) => [formatBDT(typeof value === "number" ? value : 0), "Sales"]}

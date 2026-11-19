@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import delete, func, select
@@ -17,6 +18,7 @@ from app.models import (
     PurchaseItem,
     StockLot,
     Supplier,
+    SupplierCreditNote,
     SupplierLedger,
     SupplierProduct,
 )
@@ -125,10 +127,21 @@ def save_supplier(
     return result
 
 
-def purchase_result(purchase: Purchase) -> PurchaseOut:
+def purchase_payable(db: Session, purchase_id: UUID) -> Decimal:
+    return db.scalar(
+        select(func.coalesce(func.sum(SupplierLedger.amount), 0)).where(
+            SupplierLedger.purchase_id == purchase_id,
+            SupplierLedger.kind.in_(
+                ("opening", "receipt", "payment", "reversal", "credit_application")
+            ),
+        )
+    )
+
+
+def purchase_result(db: Session, purchase: Purchase) -> PurchaseOut:
     out = PurchaseOut.model_validate(purchase)
     if purchase.status in {"received", "partially_received"}:
-        out.outstanding = purchase.received_total - purchase.paid_total
+        out.outstanding = purchase_payable(db, purchase.id)
     return out
 
 
@@ -168,7 +181,7 @@ def _idempotent_purchase(
         else:
             purchase = operation()
             db.flush()
-            result = purchase_result(purchase)
+            result = purchase_result(db, purchase)
             record.response_body = result.model_dump(mode="json")
         db.commit()
         return result
@@ -435,10 +448,10 @@ def pay_purchase(
 ):
     def pay():
         purchase = purchase_by_id(db, principal, purchase_id, lock=True)
-        if (
-            purchase.status not in {"received", "partially_received"}
-            or body.amount > purchase.received_total - purchase.paid_total
-        ):
+        if purchase.status not in {
+            "received",
+            "partially_received",
+        } or body.amount > purchase_payable(db, purchase.id):
             raise ValidationError("Payment exceeds the recorded supplier balance")
         purchase.paid_total += body.amount
         db.add(
@@ -495,6 +508,19 @@ def reverse_purchase(db: Session, principal: Principal, purchase_id: UUID, reaso
         purchase = purchase_by_id(db, principal, purchase_id, lock=True)
         if purchase.status not in {"received", "partially_received"} or purchase.paid_total:
             raise ConflictError("Only unpaid received purchases can be reversed")
+        if db.scalar(
+            select(SupplierCreditNote.id)
+            .where(SupplierCreditNote.purchase_id == purchase.id)
+            .limit(1)
+        ) or db.scalar(
+            select(SupplierLedger.id)
+            .where(
+                SupplierLedger.purchase_id == purchase.id,
+                SupplierLedger.kind == "credit_application",
+            )
+            .limit(1)
+        ):
+            raise ConflictError("A credited purchase cannot be reversed")
         item_ids = {item.id for item in purchase.items}
         products = lock_products(
             db, principal.shop_id, {item.product_id for item in purchase.items}
@@ -515,7 +541,9 @@ def reverse_purchase(db: Session, principal: Principal, purchase_id: UUID, reaso
             .order_by(StockLot.id)
             .with_for_update(key_share=True)
         ).all()
-        if not lots or any(lot.quantity_remaining != lot.quantity_received for lot in lots):
+        if not lots or any(
+            lot.held_quantity or lot.quantity_remaining != lot.quantity_received for lot in lots
+        ):
             raise ConflictError(
                 "Purchase stock is already used or its original lots are unavailable"
             )

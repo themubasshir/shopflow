@@ -141,6 +141,7 @@ class BatchOut(BaseModel):
     received_at: datetime | None
     quantity_received: Decimal
     quantity_on_hand: Decimal
+    held_quantity: Decimal
     purchase_cost: Decimal | None
     price_reference: Decimal | None
     days_to_expiry: int
@@ -165,6 +166,7 @@ class MovementOut(BaseModel):
 class StockValue(BaseModel):
     product_id: UUID
     quantity_on_hand: Decimal
+    held_quantity: Decimal
     available: Decimal
     ledger_quantity: Decimal
     value: Decimal

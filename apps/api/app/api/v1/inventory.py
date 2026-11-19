@@ -76,7 +76,10 @@ def list_batches(
             )
         )
     if window == "quarantined":
-        stmt = stmt.where(MedicineBatch.quarantined.is_(True), MedicineBatch.quantity_on_hand > 0)
+        stmt = stmt.where(
+            or_(MedicineBatch.quarantined.is_(True), MedicineBatch.held_quantity > 0),
+            MedicineBatch.quantity_on_hand > 0,
+        )
     elif window == "expired":
         stmt = stmt.where(MedicineBatch.expiry_date <= today, MedicineBatch.quantity_on_hand > 0)
     elif window != "all":
@@ -103,6 +106,7 @@ def list_batches(
                 received_at=batch.received_at.replace(tzinfo=UTC) if batch.received_at else None,
                 quantity_received=batch.quantity_received,
                 quantity_on_hand=batch.quantity_on_hand,
+                held_quantity=batch.held_quantity,
                 purchase_cost=batch.purchase_cost,
                 price_reference=price,
                 days_to_expiry=(batch.expiry_date - today).days,

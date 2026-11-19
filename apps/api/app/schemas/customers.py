@@ -76,6 +76,7 @@ class CustomerLedgerEntryOut(BaseModel):
     id: int
     invoice_id: UUID
     invoice_number: str
+    return_id: UUID | None = None
     payment_id: UUID | None
     amount: Decimal
     balance_after: Decimal

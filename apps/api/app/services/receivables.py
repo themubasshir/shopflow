@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import Principal
 from app.core.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
-from app.models import AuditLog, Customer, CustomerLedgerEntry, Invoice, Payment
+from app.models import AuditLog, Customer, CustomerLedgerEntry, CustomerReturn, Invoice, Payment
 from app.schemas.customers import CustomerPaymentOut, DuePaymentCreate, DuePaymentOut
 from app.schemas.sales import payment_status
 from app.services.customers import get_customer
@@ -111,7 +111,18 @@ def _collect_due_payment(
     invoice.due_total -= body.amount
     points = 0
     if not invoice.due_total and invoice.loyalty_earn_base is not None:
-        points = award_qualified_points(db, lock_account(db, customer), invoice, principal.user_id)
+        eligible_returned = db.scalar(
+            select(func.coalesce(func.sum(CustomerReturn.eligible_value), 0)).where(
+                CustomerReturn.invoice_id == invoice.id
+            )
+        )
+        points = award_qualified_points(
+            db,
+            lock_account(db, customer),
+            invoice,
+            principal.user_id,
+            returned_eligible=eligible_returned,
+        )
 
     payment = Payment(
         invoice_id=invoice.id,

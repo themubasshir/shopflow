@@ -145,14 +145,14 @@ def list_purchases(
         )
     rows, count = window(db, stmt.order_by(Purchase.created_at.desc(), Purchase.id), limit, offset)
     return Paginated(
-        items=[purchase_result(p) for p in rows], total=count, limit=limit, offset=offset
+        items=[purchase_result(db, p) for p in rows], total=count, limit=limit, offset=offset
     )
 
 
 @router.get("/purchases/{purchase_id}", response_model=PurchaseOut)
 def purchase_detail(purchase_id: UUID, db: Db, principal: Caller):
     inventory_access(principal)
-    return purchase_result(purchase_by_id(db, principal, purchase_id))
+    return purchase_result(db, purchase_by_id(db, principal, purchase_id))
 
 
 @router.post("/purchases", response_model=PurchaseOut, status_code=201)

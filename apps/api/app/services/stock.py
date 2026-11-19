@@ -38,7 +38,7 @@ def expiry_status(batch: MedicineBatch, today: date) -> str:
         return "expired"
     if not batch.is_active:
         return "inactive"
-    return "depleted" if batch.quantity_on_hand <= 0 else "available"
+    return "depleted" if batch.quantity_on_hand <= batch.held_quantity else "available"
 
 
 def eligible_batches(today: date):
@@ -46,13 +46,15 @@ def eligible_batches(today: date):
         MedicineBatch.expiry_date > today,
         MedicineBatch.is_active.is_(True),
         MedicineBatch.quarantined.is_(False),
-        MedicineBatch.quantity_on_hand > 0,
+        MedicineBatch.quantity_on_hand > MedicineBatch.held_quantity,
     )
 
 
 def available_stock(today: date):
     eligible = (
-        select(func.coalesce(func.sum(MedicineBatch.quantity_on_hand), 0))
+        select(
+            func.coalesce(func.sum(MedicineBatch.quantity_on_hand - MedicineBatch.held_quantity), 0)
+        )
         .where(
             MedicineBatch.product_id == Product.id,
             MedicineBatch.shop_id == Product.shop_id,
@@ -61,7 +63,10 @@ def available_stock(today: date):
         .correlate(Product)
         .scalar_subquery()
     )
-    return case((Product.is_medicine.is_(True), eligible), else_=Product.stock_on_hand)
+    return case(
+        (Product.is_medicine.is_(True), eligible),
+        else_=Product.stock_on_hand - Product.held_quantity,
+    )
 
 
 def lock_products(db: Session, shop_id: UUID, product_ids) -> dict[UUID, Product]:
@@ -125,7 +130,7 @@ def plan_sale(db: Session, shop_id: UUID, lines, at: datetime):
         batches, key=lambda b: (b.expiry_date, b.received_at or b.created_at, b.id)
     ):
         by_product[batch.product_id].append(batch)
-        leftover[batch.id] = batch.quantity_on_hand
+        leftover[batch.id] = batch.quantity_on_hand - batch.held_quantity
     for product_id in medicine:
         available = sum((leftover[b.id] for b in by_product[product_id]), ZERO)
         if available < requested[product_id]:
@@ -161,19 +166,19 @@ def _lot_deductions(db: Session, product: Product, batch, available, amount):
         .where(
             StockLot.product_id == product.id,
             StockLot.batch_id == batch_id,
-            StockLot.quantity_remaining > 0,
+            StockLot.quantity_remaining > StockLot.held_quantity,
         )
         .order_by(StockLot.id)
         .with_for_update(key_share=True)
     ).all()
-    opening = available - sum((lot.quantity_remaining for lot in lots), ZERO)
+    opening = available - sum((lot.quantity_remaining - lot.held_quantity for lot in lots), ZERO)
     if opening < 0:
         raise ValidationError("Stock lots do not reconcile with physical inventory")
     from_opening = min(opening, amount)
     portions = [(None, from_opening)] if from_opening else []
     amount -= from_opening
     for lot in sorted(lots, key=lambda row: (row.created_at, row.id)):
-        taken = min(amount, lot.quantity_remaining)
+        taken = min(amount, lot.quantity_remaining - lot.held_quantity)
         if taken:
             portions.append((lot, taken))
             amount -= taken
@@ -195,29 +200,47 @@ def post_stock(
     batch: MedicineBatch | None = None,
     lot: StockLot | None = None,
     counter_id: UUID | None = None,
+    invoice_item_id: UUID | None = None,
+    source_movement_id: UUID | None = None,
+    held: bool = False,
 ) -> None:
     """Apply a movement to the locked physical projections and append ledger entries."""
-    available = batch.quantity_on_hand if batch else product.stock_on_hand
+    physical = batch.quantity_on_hand if batch else product.stock_on_hand
+    reserved = batch.held_quantity if batch else product.held_quantity
+    available = reserved if held else physical - reserved
     if (
-        not 0 <= available + quantity <= MAX_QUANTITY
+        physical + quantity > MAX_QUANTITY
+        or not 0 <= available + quantity <= MAX_QUANTITY
         or not 0 <= product.stock_on_hand + quantity <= MAX_QUANTITY
     ):
         raise InsufficientStockError("Stock movement exceeds physical inventory limits")
     if quantity > 0:
         portions = [(lot, quantity)]
-    elif lot is not None:
-        if lot.quantity_remaining < -quantity:
+    elif held or lot is not None:
+        lot_available = (
+            lot.held_quantity
+            if held and lot
+            else (lot.quantity_remaining - lot.held_quantity if lot else available)
+        )
+        if lot_available < -quantity:
             raise InsufficientStockError("This receipt lot has already been used")
         portions = [(lot, -quantity)]
     else:
         portions = _lot_deductions(db, product, batch, available, -quantity)
 
     product.stock_on_hand += quantity
+    if held:
+        product.held_quantity += quantity
     if batch:
         batch.quantity_on_hand += quantity
+        if held:
+            batch.held_quantity += quantity
     for source, portion in portions:
-        if source is not None and quantity < 0:
-            source.quantity_remaining -= portion
+        if source is not None:
+            if quantity < 0 or source_movement_id is not None:
+                source.quantity_remaining += portion if quantity > 0 else -portion
+            if held:
+                source.held_quantity += portion if quantity > 0 else -portion
         db.add(
             StockMovement(
                 shop_id=principal.shop_id,
@@ -225,6 +248,9 @@ def post_stock(
                 batch_id=batch.id if batch else None,
                 stock_lot_id=source.id if source else None,
                 counter_id=counter_id,
+                invoice_item_id=invoice_item_id,
+                source_movement_id=source_movement_id,
+                held=held,
                 movement_type=movement_type,
                 quantity=portion if quantity > 0 else -portion,
                 unit_cost=(source.cost_amount / source.quantity_received).quantize(MONEY)

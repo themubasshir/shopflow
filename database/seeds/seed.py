@@ -19,9 +19,6 @@ from pathlib import Path
 # Allow `python seed.py` directly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps" / "api"))
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
-
 from app.core.permissions import (
     CASHIER_PERMISSIONS,
     MANAGER_PERMISSIONS,
@@ -50,6 +47,8 @@ from app.models import (
     User,
     UserCounter,
 )
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 rng = random.Random(42)
 TODAY = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -85,9 +84,27 @@ def seed(db) -> None:
     db.flush()
 
     counters = [
-        Counter(shop_id=shop.id, code="C1", name_en="Counter 1", name_bn="কাউন্টার ১", sort_order=1),
-        Counter(shop_id=shop.id, code="C2", name_en="Counter 2", name_bn="কাউন্টার ২", sort_order=2),
-        Counter(shop_id=shop.id, code="C3", name_en="Counter 3", name_bn="কাউন্টার ৩", sort_order=3),
+        Counter(
+            shop_id=shop.id,
+            code="C1",
+            name_en="Counter 1",
+            name_bn="কাউন্টার ১",
+            sort_order=1,
+        ),
+        Counter(
+            shop_id=shop.id,
+            code="C2",
+            name_en="Counter 2",
+            name_bn="কাউন্টার ২",
+            sort_order=2,
+        ),
+        Counter(
+            shop_id=shop.id,
+            code="C3",
+            name_en="Counter 3",
+            name_bn="কাউন্টার ৩",
+            sort_order=3,
+        ),
     ]
     db.add_all(counters)
 
@@ -170,8 +187,12 @@ def seed(db) -> None:
     cashier2 = users[3]
     db.add_all(
         [
-            UserCounter(shop_id=shop.id, user_id=cashier1.id, counter_id=counters[0].id),
-            UserCounter(shop_id=shop.id, user_id=cashier2.id, counter_id=counters[1].id),
+            UserCounter(
+                shop_id=shop.id, user_id=cashier1.id, counter_id=counters[0].id
+            ),
+            UserCounter(
+                shop_id=shop.id, user_id=cashier2.id, counter_id=counters[1].id
+            ),
         ]
     )
     db.flush()
@@ -245,7 +266,9 @@ def seed(db) -> None:
         db.add(pu)
         if med:
             med_fields = {
-                k: v for k, v in med.items() if k not in {"batch_number", "days_to_expiry"}
+                k: v
+                for k, v in med.items()
+                if k not in {"batch_number", "days_to_expiry"}
             }
             detail = MedicineDetail(
                 product_id=p.id,
@@ -258,7 +281,8 @@ def seed(db) -> None:
                 shop_id=shop.id,
                 product_id=p.id,
                 batch_number=med.get("batch_number", f"B{sku[-3:]}"),
-                expiry_date=date.today() + timedelta(days=med.get("days_to_expiry", 365)),
+                expiry_date=date.today()
+                + timedelta(days=med.get("days_to_expiry", 365)),
                 quantity_on_hand=Decimal(stock),
                 quantity_received=Decimal(stock),
                 purchase_cost=Decimal(price) * Decimal("0.82"),
@@ -328,7 +352,16 @@ def seed(db) -> None:
         8,
     )
     add_product(
-        frozen, "F-002", "8941006", "Paratha 20pc", "পরোটা ২০টি", ["porota"], "pack", 280, 30, 10
+        frozen,
+        "F-002",
+        "8941006",
+        "Paratha 20pc",
+        "পরোটা ২০টি",
+        ["porota"],
+        "pack",
+        280,
+        30,
+        10,
     )
 
     add_product(
@@ -500,6 +533,7 @@ def seed(db) -> None:
             customer_id=cust.id,
             shop_id=shop.id,
             points_balance=balance,
+            opening_points=balance,
             lifetime_earned=earned,
             lifetime_redeemed=earned - balance,
         )
@@ -526,25 +560,37 @@ def seed_invoices(db) -> None:
     """Create a week of finalized invoices, payments and stock movements."""
     shop = db.scalar(select(Shop).order_by(Shop.created_at).limit(1))
     counters = (
-        db.execute(select(Counter).where(Counter.shop_id == shop.id).order_by(Counter.sort_order))
+        db.execute(
+            select(Counter)
+            .where(Counter.shop_id == shop.id)
+            .order_by(Counter.sort_order)
+        )
         .scalars()
         .all()
     )
     users = (
-        db.execute(select(User).where(User.shop_id == shop.id).order_by(User.created_at))
+        db.execute(
+            select(User).where(User.shop_id == shop.id).order_by(User.created_at)
+        )
         .scalars()
         .all()
     )
     product_list = (
         db.execute(
-            select(Product).options(selectinload(Product.units)).where(Product.shop_id == shop.id)
+            select(Product)
+            .options(selectinload(Product.units))
+            .where(Product.shop_id == shop.id)
         )
         .scalars()
         .all()
     )
-    customer_list = db.execute(select(Customer).where(Customer.shop_id == shop.id)).scalars().all()
+    customer_list = (
+        db.execute(select(Customer).where(Customer.shop_id == shop.id)).scalars().all()
+    )
     account_list = (
-        db.execute(select(LoyaltyAccount).where(LoyaltyAccount.shop_id == shop.id)).scalars().all()
+        db.execute(select(LoyaltyAccount).where(LoyaltyAccount.shop_id == shop.id))
+        .scalars()
+        .all()
     )
     non_eligible_cat = db.scalar(select(Category).where(Category.slug == "excluded"))
 
@@ -556,7 +602,9 @@ def seed_invoices(db) -> None:
             for _ in range(rng.randint(1, 3)):
                 hour = rng.randint(9, 21)
                 created = day.replace(hour=hour, minute=rng.randint(0, 59))
-                eligible_pool = [p for p in product_list if p.category_id != non_eligible_cat.id]
+                eligible_pool = [
+                    p for p in product_list if p.category_id != non_eligible_cat.id
+                ]
                 k = min(rng.randint(1, 4), len(eligible_pool))
                 chosen = rng.sample(eligible_pool, k=k)
                 items = []
@@ -580,13 +628,17 @@ def seed_invoices(db) -> None:
                     )
                     subtotal += line_total
                 discount = Decimal("0") if rng.random() < 0.7 else Decimal("20")
-                discount = min(discount, (subtotal * Decimal("0.05")).quantize(Decimal("0.01")))
+                discount = min(
+                    discount, (subtotal * Decimal("0.05")).quantize(Decimal("0.01"))
+                )
                 total = (subtotal - discount).quantize(Decimal("0.01"))
                 if total <= 0:
                     continue  # never seed a zero-value sale
                 invoice_no += 1
                 account_customers = [
-                    c for c in customer_list if any(a.customer_id == c.id for a in account_list)
+                    c
+                    for c in customer_list
+                    if any(a.customer_id == c.id for a in account_list)
                 ]
                 customer = rng.choice([None, None, *account_customers])
                 points = int(total // 100) if customer else 0
@@ -648,7 +700,9 @@ def seed_invoices(db) -> None:
                     )
 
     db.flush()
-    for batch in db.scalars(select(MedicineBatch).where(MedicineBatch.shop_id == shop.id)):
+    for batch in db.scalars(
+        select(MedicineBatch).where(MedicineBatch.shop_id == shop.id)
+    ):
         if batch.quantity_on_hand:
             db.add(
                 StockMovement(

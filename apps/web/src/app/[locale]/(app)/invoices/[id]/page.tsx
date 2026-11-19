@@ -7,6 +7,8 @@ import { receiptLanguage } from "@/lib/receipt/paper";
 import { EmptyState } from "@/components/ui/empty-state";
 import { secondaryButton } from "@/components/ui/pos-form";
 import { ReceiptPreview } from "./receipt-preview";
+import { hasPermission, verifySession } from "@/lib/session";
+import { ReturnPanel } from "./returns";
 
 export default async function InvoiceReceiptPage({ params, searchParams }: {
   params: Promise<{ id: string }>;
@@ -18,9 +20,13 @@ export default async function InvoiceReceiptPage({ params, searchParams }: {
     if (error instanceof ApiError && error.status === 404) notFound();
     return null;
   });
+  const session = receipt ? await verifySession() : null;
+  const canViewReturns = receipt?.status === "finalized" && session && hasPermission(session.me, "reports:read");
+  const canWriteReturns = Boolean(session && ["sales:write", "catalog:write"].every((permission) => hasPermission(session.me, permission)));
   return (
     <div className="space-y-4">
       <Link href="/invoices" className={secondaryButton}><ArrowLeft size={17} aria-hidden="true" />{t("history")}</Link>
+      {canViewReturns && <ReturnPanel invoiceId={id} canWrite={canWriteReturns} />}
       {receipt ? (
         <ReceiptPreview id={id} number={receipt.invoice_number}
           initialLanguage={receiptLanguage(query.lang, receipt.identity.branding?.preferred_language)} />

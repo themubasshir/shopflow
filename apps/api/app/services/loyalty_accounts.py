@@ -44,7 +44,9 @@ def rule_snapshot(db: Session, shop_id: UUID) -> dict:
     }
 
 
-def lock_account(db: Session, customer: Customer, *, create: bool = False) -> LoyaltyAccount | None:
+def lock_account(
+    db: Session, customer: Customer, *, create: bool = False, include_inactive: bool = False
+) -> LoyaltyAccount | None:
     # The caller owns the customer row lock, including when the account is absent.
     account = db.scalar(
         select(LoyaltyAccount)
@@ -57,7 +59,7 @@ def lock_account(db: Session, customer: Customer, *, create: bool = False) -> Lo
         account = LoyaltyAccount(customer_id=customer.id, shop_id=customer.shop_id)
         db.add(account)
         db.flush()
-    return account if account and account.is_active else None
+    return account if account and (account.is_active or include_inactive) else None
 
 
 def redemption_discount(account: LoyaltyAccount | None, points: int, eligible: Decimal) -> Decimal:
@@ -94,7 +96,12 @@ def record_redemption(db: Session, account: LoyaltyAccount, invoice: Invoice, ac
 
 
 def award_qualified_points(
-    db: Session, account: LoyaltyAccount | None, invoice: Invoice, actor: UUID
+    db: Session,
+    account: LoyaltyAccount | None,
+    invoice: Invoice,
+    actor: UUID,
+    *,
+    returned_eligible: Decimal = Decimal(0),
 ) -> int:
     if (
         account is None
@@ -111,11 +118,13 @@ def award_qualified_points(
         redeem_step_points=saved["redeem_step_points"],
         point_value_bdt=Decimal(saved["point_value_bdt"]),
     )
-    points = points_earned(invoice.loyalty_earn_base, policy)
+    eligible = max(invoice.loyalty_earn_base - returned_eligible, Decimal(0))
+    points = points_earned(eligible, policy)
     if points:
         account.points_balance += points
         account.lifetime_earned += points
         invoice.loyalty_points_earned = points
+        invoice.loyalty_award_base = eligible
         db.add(
             LoyaltyTransaction(
                 account_id=account.id,

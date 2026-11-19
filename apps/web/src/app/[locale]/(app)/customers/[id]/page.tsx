@@ -126,7 +126,7 @@ export default async function CustomerPage({ params, searchParams }: {
                   ) : "transaction_type" in row ? (
                     <p className="text-sm tabular-nums">{row.points > 0 ? "+" : ""}{row.points} · {t("pointsBalance")} {row.balance_after}</p>
                   ) : (
-                    <p className="text-sm tabular-nums">{t(row.payment_id ? "collectionEntry" : "chargeEntry")} · {t("outstanding")} {formatBDT(row.balance_after)}</p>
+                    <p className="text-sm tabular-nums">{t(row.return_id ? "returnEntry" : row.payment_id ? "collectionEntry" : "chargeEntry")} · {t("outstanding")} {formatBDT(row.balance_after)}</p>
                   )}
                 </Card>
               </li>

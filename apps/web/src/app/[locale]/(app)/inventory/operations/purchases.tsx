@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Plus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { PurchaseCreditsPanel } from "./credits";
 import { Badge } from "@/components/ui/badge";
 import { fieldClass, secondaryButton } from "@/components/ui/pos-form";
 import { formatBDT, formatQuantity, localizedName } from "@/lib/format";
@@ -213,6 +214,7 @@ function PurchaseDetail({ purchase, initial, canWrite, refresh, close }: {
         </div>}
         {(action === "cancel" || action === "reverse") && <Field name="reason" label={t("reason")} required />}
       </Form>}
+      {posted && <PurchaseCreditsPanel purchase={purchase} canWrite={canWrite} refreshPurchase={refresh} />}
       <WriteStatus state={state} />
     </Card>
   );

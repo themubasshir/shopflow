@@ -39,6 +39,9 @@ class StockMovement(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     stock_lot_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("stock_lots.id", ondelete="RESTRICT")
     )
+    held: Mapped[bool] = mapped_column(server_default=text("false"))
+    invoice_item_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("invoice_items.id"))
+    source_movement_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("stock_movements.id"))
     counter_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("counters.id", ondelete="SET NULL")
     )
@@ -203,6 +206,7 @@ class StockLot(UUIDPrimaryKeyMixin, Base):
     )
     quantity_received: Mapped[Decimal] = mapped_column(QUANTITY)
     quantity_remaining: Mapped[Decimal] = mapped_column(QUANTITY)
+    held_quantity: Mapped[Decimal] = mapped_column(QUANTITY, server_default="0")
     cost_amount: Mapped[Decimal | None] = mapped_column(MONEY)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -216,6 +220,7 @@ class SupplierLedger(UUIDPrimaryKeyMixin, Base):
     purchase_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("purchases.id", ondelete="RESTRICT"), index=True
     )
+    credit_note_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("supplier_credit_notes.id"))
     kind: Mapped[str] = mapped_column(String(24))
     amount: Mapped[Decimal] = mapped_column(MONEY)
     method: Mapped[str | None] = mapped_column(String(16))

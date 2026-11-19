@@ -117,6 +117,7 @@ def _price_items(
                         "unit_en": unit.name,
                         "unit_bn": unit.name_bn,
                         "position": len(items),
+                        "base_quantity": str(base_qty),
                     },
                     quantity=quantity,
                     unit_price=unit.selling_price,
@@ -129,7 +130,7 @@ def _price_items(
         )
 
     for pid, base_qty in requested.items():
-        available = products[pid].stock_on_hand
+        available = products[pid].stock_on_hand - products[pid].held_quantity
         if not products[pid].is_medicine and available < base_qty:
             raise InsufficientStockError(
                 "Insufficient stock",
@@ -313,6 +314,7 @@ def _finalize_invoice(
                 reference_id=invoice.id,
                 batch=batch,
                 counter_id=counter.id,
+                invoice_item_id=item.id,
             )
             if batch:
                 db.add(

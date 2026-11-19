@@ -87,6 +87,7 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     low_stock_threshold: Mapped[Decimal] = mapped_column(
         QUANTITY, nullable=False, server_default="10"
     )
+    held_quantity: Mapped[Decimal] = mapped_column(QUANTITY, server_default="0")
     stock_on_hand: Mapped[Decimal] = mapped_column(
         QUANTITY,
         nullable=False,
@@ -208,6 +209,7 @@ class MedicineBatch(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     quantity_received: Mapped[Decimal] = mapped_column(QUANTITY, nullable=False, server_default="0")
     manufacture_date: Mapped[date | None] = mapped_column(Date)
     quarantined: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    held_quantity: Mapped[Decimal] = mapped_column(QUANTITY, server_default="0")
     quantity_on_hand: Mapped[Decimal] = mapped_column(QUANTITY, nullable=False, server_default="0")
     purchase_cost: Mapped[Decimal | None] = mapped_column(MONEY)
     mrp: Mapped[Decimal | None] = mapped_column(MONEY)

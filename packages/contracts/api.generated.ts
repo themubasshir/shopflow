@@ -517,6 +517,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/invoices/{invoice_id}/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** History */
+        get: operations["history_api_v1_invoices__invoice_id__returns_get"];
+        put?: never;
+        /** Add Return */
+        post: operations["add_return_api_v1_invoices__invoice_id__returns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invoices/{invoice_id}/returns/{return_id}/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Settle Refund */
+        post: operations["settle_refund_api_v1_invoices__invoice_id__returns__return_id__refund_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invoices/{invoice_id}/return-lines/{line_id}/disposition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Settle Stock */
+        post: operations["settle_stock_api_v1_invoices__invoice_id__return_lines__line_id__disposition_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchases/{purchase_id}/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Credit History */
+        get: operations["credit_history_api_v1_purchases__purchase_id__credits_get"];
+        put?: never;
+        /** Note */
+        post: operations["note_api_v1_purchases__purchase_id__credits_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchases/{purchase_id}/supplier-returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ship */
+        post: operations["ship_api_v1_purchases__purchase_id__supplier_returns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/suppliers/{supplier_id}/credits/{note_id}/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Allocate */
+        post: operations["allocate_api_v1_suppliers__supplier_id__credits__note_id__applications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/suppliers/{supplier_id}/credits/{note_id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Supplier Refund */
+        post: operations["supplier_refund_api_v1_suppliers__supplier_id__credits__note_id__refunds_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reconcile */
+        get: operations["reconcile_api_v1_reports_reconciliation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/financial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Financial Report */
+        get: operations["financial_report_api_v1_reports_financial_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -894,6 +1049,8 @@ export interface components {
             quantity_received: string;
             /** Quantity On Hand */
             quantity_on_hand: string;
+            /** Held Quantity */
+            held_quantity: string;
             /** Purchase Cost */
             purchase_cost: string | null;
             /** Price Reference */
@@ -992,6 +1149,112 @@ export interface components {
             /** Name Bn */
             name_bn?: string | null;
         };
+        /** CreditApply */
+        CreditApply: {
+            /**
+             * Purchase Id
+             * Format: uuid
+             */
+            purchase_id: string;
+            /** Amount */
+            amount: number | string;
+        };
+        /** CreditEntryOut */
+        CreditEntryOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Purchase Id
+             * Format: uuid
+             */
+            purchase_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Kind */
+            kind: string;
+            /** Amount */
+            amount: string;
+            /** Method */
+            method: string | null;
+            /** Reference */
+            reference: string | null;
+        };
+        /** CreditNoteOut */
+        CreditNoteOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Purchase Id
+             * Format: uuid
+             */
+            purchase_id: string;
+            /**
+             * Supplier Id
+             * Format: uuid
+             */
+            supplier_id: string;
+            /**
+             * Shipment Id
+             * Format: uuid
+             */
+            shipment_id: string;
+            /** Reference */
+            reference: string;
+            /** Reason */
+            reason: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Available
+             * @default 0
+             */
+            available: string;
+            /**
+             * Applied
+             * @default 0
+             */
+            applied: string;
+            /**
+             * Refunded
+             * @default 0
+             */
+            refunded: string;
+            /** Entries */
+            entries?: components["schemas"]["CreditEntryOut"][];
+            /**
+             * Idempotent Replay
+             * @default false
+             */
+            idempotent_replay: boolean;
+        };
+        /** CreditWrite */
+        CreditWrite: {
+            /**
+             * Shipment Id
+             * Format: uuid
+             */
+            shipment_id: string;
+            /** Reference */
+            reference: string;
+            /** Reason */
+            reason: string;
+            /** Amount */
+            amount: number | string;
+        };
         /** CustomerBalanceOut */
         CustomerBalanceOut: {
             /** Outstanding Due */
@@ -1029,6 +1292,8 @@ export interface components {
             invoice_id: string;
             /** Invoice Number */
             invoice_number: string;
+            /** Return Id */
+            return_id?: string | null;
             /** Payment Id */
             payment_id: string | null;
             /** Amount */
@@ -1159,6 +1424,25 @@ export interface components {
              * Format: date-time
              */
             generated_at: string;
+        };
+        /** Discrepancy */
+        Discrepancy: {
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "invoice" | "customer_due" | "refund" | "loyalty" | "supplier" | "product" | "batch" | "allocation" | "lot" | "valuation";
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Check */
+            check: string;
+            /** Expected */
+            expected: string;
+            /** Actual */
+            actual: string;
         };
         /** DuePaymentCreate */
         DuePaymentCreate: {
@@ -1293,6 +1577,51 @@ export interface components {
             quantity_on_hand: string;
             /** Days To Expiry */
             days_to_expiry: number;
+        };
+        /** FinanceReport */
+        FinanceReport: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Gross Sales */
+            gross_sales: string;
+            /** Discounts */
+            discounts: string;
+            /** Customer Returns */
+            customer_returns: string;
+            /** Net Sales */
+            net_sales: string;
+            /** Collections */
+            collections: string;
+            /** Refunds */
+            refunds: string;
+            /** Pending Refunds */
+            pending_refunds: string;
+            /** Outstanding Dues */
+            outstanding_dues: string;
+            /** Supplier Payables */
+            supplier_payables: string;
+            /** Supplier Credits */
+            supplier_credits: string;
+            /** Supplier Receivables */
+            supplier_receivables: string;
+            /** Supplier Refunds */
+            supplier_refunds: string;
+            /** Loyalty Issued */
+            loyalty_issued: number;
+            /** Loyalty Redeemed */
+            loyalty_redeemed: number;
+            /** Loyalty Reversed */
+            loyalty_reversed: number;
+            /** Loyalty Restored */
+            loyalty_restored: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1536,6 +1865,20 @@ export interface components {
             loyalty_points_earned: number;
             /** Loyalty Points Balance */
             loyalty_points_balance: number | null;
+        };
+        /** InvoiceReturnsOut */
+        InvoiceReturnsOut: {
+            /**
+             * Invoice Id
+             * Format: uuid
+             */
+            invoice_id: string;
+            /** Outstanding Due */
+            outstanding_due: string;
+            /** Rows */
+            rows: components["schemas"]["ReturnOption"][];
+            /** History */
+            history: components["schemas"]["ReturnOut"][];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1886,6 +2229,17 @@ export interface components {
             /** Is Base */
             is_base: boolean;
         };
+        /** PurchaseCreditsOut */
+        PurchaseCreditsOut: {
+            /** Payable */
+            payable: string;
+            /** Lots */
+            lots: components["schemas"]["SupplierLotOut"][];
+            /** Shipments */
+            shipments: components["schemas"]["SupplierShipmentOut"][];
+            /** Notes */
+            notes: components["schemas"]["CreditNoteOut"][];
+        };
         /** PurchaseLineOut */
         PurchaseLineOut: {
             /**
@@ -2168,10 +2522,188 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** ReconciliationOut */
+        ReconciliationOut: {
+            /** Items */
+            items: components["schemas"]["Discrepancy"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** RefundComplete */
+        RefundComplete: {
+            /** Reference */
+            reference: string;
+        };
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
             /** New Password */
             new_password: string;
+        };
+        /** ResolveReturnStock */
+        ResolveReturnStock: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "dispose" | "supplier_return";
+            /** Reason */
+            reason: string;
+        };
+        /** ReturnLineOut */
+        ReturnLineOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Invoice Item Id
+             * Format: uuid
+             */
+            invoice_item_id: string;
+            /** Batch Id */
+            batch_id: string | null;
+            /** Quantity */
+            quantity: string;
+            /** Amount */
+            amount: string;
+            /**
+             * Disposition
+             * @enum {string}
+             */
+            disposition: "sellable" | "quarantine" | "damaged" | "disposal" | "supplier_staging";
+            /** Verified */
+            verified: boolean;
+            /**
+             * Held
+             * @default false
+             */
+            held: boolean;
+            /**
+             * Stock Traced
+             * @default false
+             */
+            stock_traced: boolean;
+        };
+        /** ReturnOption */
+        ReturnOption: {
+            /**
+             * Invoice Item Id
+             * Format: uuid
+             */
+            invoice_item_id: string;
+            /** Description */
+            description: string;
+            /** Name Bn */
+            name_bn: string | null;
+            /** Base Unit */
+            base_unit: string;
+            /** Batch Id */
+            batch_id: string | null;
+            /** Batch Number */
+            batch_number: string | null;
+            /** Expiry Date */
+            expiry_date: string | null;
+            /** Quantity */
+            quantity: string;
+            /** Remaining */
+            remaining: string;
+            /** Medicine */
+            medicine: boolean;
+            /** Stock Traced */
+            stock_traced: boolean;
+            /** Can Restore */
+            can_restore: boolean;
+        };
+        /** ReturnOut */
+        ReturnOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Invoice Id
+             * Format: uuid
+             */
+            invoice_id: string;
+            /**
+             * Actor Id
+             * Format: uuid
+             */
+            actor_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Reason */
+            reason: string;
+            /** Amount */
+            amount: string;
+            /** Due Reduction */
+            due_reduction: string;
+            /** Refund Amount */
+            refund_amount: string;
+            /** Refund Method */
+            refund_method: ("cash" | "bkash" | "nagad") | null;
+            /** Earned Reversed */
+            earned_reversed: number;
+            /** Redeemed Restored */
+            redeemed_restored: number;
+            /**
+             * Refund Status
+             * @default none
+             * @enum {string}
+             */
+            refund_status: "none" | "pending" | "completed";
+            /** Refund Reference */
+            refund_reference?: string | null;
+            /** Refund Completed At */
+            refund_completed_at?: string | null;
+            /** Refund Actor Id */
+            refund_actor_id?: string | null;
+            /** Lines */
+            lines?: components["schemas"]["ReturnLineOut"][];
+            /**
+             * Idempotent Replay
+             * @default false
+             */
+            idempotent_replay: boolean;
+        };
+        /** ReturnSelection */
+        ReturnSelection: {
+            /**
+             * Invoice Item Id
+             * Format: uuid
+             */
+            invoice_item_id: string;
+            /** Batch Id */
+            batch_id?: string | null;
+            /** Quantity */
+            quantity: number | string;
+            /** Disposition */
+            disposition?: ("sellable" | "quarantine" | "damaged" | "disposal" | "supplier_staging") | null;
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
+        };
+        /** ReturnWrite */
+        ReturnWrite: {
+            /** Lines */
+            lines: components["schemas"]["ReturnSelection"][];
+            /** Reason */
+            reason: string;
+            /** Refund Method */
+            refund_method?: ("cash" | "bkash" | "nagad") | null;
+            /** Cash Reference */
+            cash_reference?: string | null;
         };
         /** RoleOut */
         RoleOut: {
@@ -2220,6 +2752,29 @@ export interface components {
             /** Unit Cost */
             unit_cost?: number | string | null;
         };
+        /** StockResolutionOut */
+        StockResolutionOut: {
+            /**
+             * Line Id
+             * Format: uuid
+             */
+            line_id: string;
+            /**
+             * Reference Id
+             * Format: uuid
+             */
+            reference_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "dispose" | "supplier_return";
+            /**
+             * Idempotent Replay
+             * @default false
+             */
+            idempotent_replay: boolean;
+        };
         /** StockValue */
         StockValue: {
             /**
@@ -2229,6 +2784,8 @@ export interface components {
             product_id: string;
             /** Quantity On Hand */
             quantity_on_hand: string;
+            /** Held Quantity */
+            held_quantity: string;
             /** Available */
             available: string;
             /** Ledger Quantity */
@@ -2266,6 +2823,22 @@ export interface components {
              */
             created_at: string;
         };
+        /** SupplierLotOut */
+        SupplierLotOut: {
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Product */
+            product: string;
+            /** Name Bn */
+            name_bn: string | null;
+            /** Batch Number */
+            batch_number: string | null;
+            /** Movable */
+            movable: string;
+        };
         /** SupplierOut */
         SupplierOut: {
             /** Name */
@@ -2302,6 +2875,54 @@ export interface components {
             method: "cash" | "bkash" | "nagad" | "bank";
             /** Reference */
             reference?: string | null;
+        };
+        /** SupplierRefundWrite */
+        SupplierRefundWrite: {
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "cash" | "bkash" | "nagad" | "bank";
+            /** Amount */
+            amount: number | string;
+            /** Reference */
+            reference: string;
+        };
+        /** SupplierReturnLine */
+        SupplierReturnLine: {
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Quantity */
+            quantity: number | string;
+        };
+        /** SupplierReturnWrite */
+        SupplierReturnWrite: {
+            /** Lines */
+            lines: components["schemas"]["SupplierReturnLine"][];
+            /** Reason */
+            reason: string;
+        };
+        /** SupplierShipmentOut */
+        SupplierShipmentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Quantity */
+            quantity: string;
+            /** Cost */
+            cost: string;
+            /** Credit Note Id */
+            credit_note_id?: string | null;
+            /**
+             * Idempotent Replay
+             * @default false
+             */
+            idempotent_replay: boolean;
         };
         /** SupplierWrite */
         SupplierWrite: {
@@ -3415,6 +4036,406 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockValue"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    history_api_v1_invoices__invoice_id__returns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceReturnsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_return_api_v1_invoices__invoice_id__returns_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReturnWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnOut"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    settle_refund_api_v1_invoices__invoice_id__returns__return_id__refund_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                invoice_id: string;
+                return_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundComplete"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    settle_stock_api_v1_invoices__invoice_id__return_lines__line_id__disposition_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                invoice_id: string;
+                line_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveReturnStock"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockResolutionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    credit_history_api_v1_purchases__purchase_id__credits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseCreditsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    note_api_v1_purchases__purchase_id__credits_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ship_api_v1_purchases__purchase_id__supplier_returns_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                purchase_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierReturnWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierShipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    allocate_api_v1_suppliers__supplier_id__credits__note_id__applications_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                supplier_id: string;
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supplier_refund_api_v1_suppliers__supplier_id__credits__note_id__refunds_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                supplier_id: string;
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierRefundWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reconcile_api_v1_reports_reconciliation_get: {
+        parameters: {
+            query?: {
+                area?: ("invoice" | "customer_due" | "refund" | "loyalty" | "supplier" | "product" | "batch" | "allocation" | "lot" | "valuation") | null;
+                entity_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    financial_report_api_v1_reports_financial_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanceReport"];
                 };
             };
             /** @description Validation Error */

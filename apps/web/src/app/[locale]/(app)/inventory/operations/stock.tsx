@@ -48,6 +48,7 @@ export function Batches({ revision, refresh, canWrite }: Props) {
           <div><dt>{t("expiry")}</dt><dd className="font-semibold">{live.expiry_date}</dd></div>
           <div><dt>{t("receivedQuantity")}</dt><dd className="font-semibold">{formatQuantity(live.quantity_received)}</dd></div>
           <div><dt>{t("physical")}</dt><dd className="font-semibold">{formatQuantity(live.quantity_on_hand)}</dd></div>
+          <div><dt>{t("heldReturns")}</dt><dd className="font-semibold">{formatQuantity(live.held_quantity)}</dd></div>
           <div><dt>{t("unitCost")}</dt><dd className="font-semibold">{live.purchase_cost === null ? "—" : formatBDT(live.purchase_cost)}</dd></div>
           <div><dt>{t("sellingReference")}</dt><dd className="font-semibold">{live.price_reference === null ? "—" : formatBDT(live.price_reference)}</dd></div>
         </dl>
@@ -117,7 +118,7 @@ export function Movements({ initial, revision, refresh, canWrite, product, setPr
         <ProductPicker initial={initial} product={product} onPick={(next) => { setProduct(next); setOffset(0); setEditing(""); }} />
         <FetchStatus loading={totals.loading} error={totals.error} />
         {totals.data && <dl className="grid grid-cols-2 gap-2 rounded-lg bg-[var(--color-primary-050)] p-3 text-sm sm:grid-cols-3">
-          {([["physical", totals.data.quantity_on_hand], ["saleable", totals.data.available], ["ledgerStock", totals.data.ledger_quantity],
+          {([["physical", totals.data.quantity_on_hand], ["heldReturns", totals.data.held_quantity], ["saleable", totals.data.available], ["ledgerStock", totals.data.ledger_quantity],
             ["valuation", formatBDT(totals.data.value)], ["unvalued", totals.data.unvalued_quantity], ["threshold", totals.data.low_stock_threshold]] as const).map(([label, value]) =>
             <div key={label}><dt>{t(label)}</dt><dd className="font-semibold">{label === "valuation" ? value : formatQuantity(value)}</dd></div>
           )}

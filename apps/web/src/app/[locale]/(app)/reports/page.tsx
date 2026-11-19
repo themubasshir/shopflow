@@ -5,6 +5,7 @@ import { SalesChart } from "@/components/dashboard/sales-chart";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FinancePanel } from "./finance";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
         <p className="text-sm text-[var(--color-muted-foreground)]">{t("subtitle")}</p>
       </div>
 
+      <FinancePanel />
       {!data ? (
         <EmptyState title={tStates("error")} hint="API unreachable." />
       ) : (

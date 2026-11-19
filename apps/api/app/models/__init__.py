@@ -24,6 +24,14 @@ from app.models.loyalty import (
     LoyaltyRule,
     LoyaltyTransaction,
 )
+from app.models.returns import (
+    CustomerRefundSettlement,
+    CustomerReturn,
+    CustomerReturnLine,
+    ReturnStockPortion,
+    ReturnStockResolution,
+    SupplierCreditNote,
+)
 from app.models.sales import Customer, CustomerLedgerEntry, Invoice, InvoiceItem, Payment
 from app.models.shop import AuthSession, Counter, Role, Shop, User, UserCounter
 
@@ -34,6 +42,9 @@ __all__ = [
     "Counter",
     "Customer",
     "CustomerLedgerEntry",
+    "CustomerRefundSettlement",
+    "CustomerReturn",
+    "CustomerReturnLine",
     "IdempotencyRecord",
     "Invoice",
     "InvoiceBatchAllocation",
@@ -50,11 +61,14 @@ __all__ = [
     "ProductUnit",
     "Purchase",
     "PurchaseItem",
+    "ReturnStockPortion",
+    "ReturnStockResolution",
     "Role",
     "Shop",
     "StockLot",
     "StockMovement",
     "Supplier",
+    "SupplierCreditNote",
     "SupplierLedger",
     "SupplierProduct",
     "User",

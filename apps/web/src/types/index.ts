@@ -2,6 +2,14 @@ import type { components } from "../../../../packages/contracts/api.generated";
 
 /** Mirrors apps/api schemas for Phase 1; generated contract types land in packages/contracts. */
 
+export type InvoiceReturns = components["schemas"]["InvoiceReturnsOut"];
+export type ReturnChoice = components["schemas"]["ReturnOption"];
+export type ReturnHistory = components["schemas"]["ReturnOut"];
+export type PurchaseCredits = components["schemas"]["PurchaseCreditsOut"];
+export type SupplierCreditNote = components["schemas"]["CreditNoteOut"];
+export type FinanceReport = components["schemas"]["FinanceReport"];
+export type Reconciliation = components["schemas"]["ReconciliationOut"];
+
 export interface Paginated<T> {
   items: T[];
   total: number;

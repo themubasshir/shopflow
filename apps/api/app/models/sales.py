@@ -81,6 +81,7 @@ class Invoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     total: Mapped[Decimal] = mapped_column(MONEY, nullable=False, server_default="0")
     paid_total: Mapped[Decimal] = mapped_column(MONEY, nullable=False, server_default="0")
     due_total: Mapped[Decimal] = mapped_column(MONEY, nullable=False, server_default="0")
+    return_due_total: Mapped[Decimal] = mapped_column(MONEY, server_default="0")
     loyalty_points_earned: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     loyalty_points_redeemed: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="0"
@@ -88,6 +89,7 @@ class Invoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     loyalty_rule_snapshot: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     receipt_identity: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     receipt_points_balance: Mapped[int | None] = mapped_column(Integer)
+    loyalty_award_base: Mapped[Decimal | None] = mapped_column(MONEY)
     loyalty_earn_base: Mapped[Decimal | None] = mapped_column(MONEY)
     idempotency_key: Mapped[str | None] = mapped_column(String(120))
     created_by: Mapped[uuid.UUID | None] = mapped_column(
@@ -122,7 +124,7 @@ class Invoice(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="loyalty_discount_within_total",
         ),
         CheckConstraint(
-            "status <> 'finalized' OR paid_total + due_total = total",
+            "status <> 'finalized' OR paid_total + due_total + return_due_total = total",
             name="finalized_payment_totals",
         ),
         Index("ix_invoices_shop_id_status_finalized_at", "shop_id", "status", "finalized_at"),
@@ -211,6 +213,9 @@ class CustomerLedgerEntry(Base):
     customer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("customers.id"), nullable=False)
     invoice_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("invoices.id"), nullable=False)
     payment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("payments.id"), unique=True)
+    return_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("customer_returns.id"), unique=True
+    )
     amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
@@ -218,7 +223,8 @@ class CustomerLedgerEntry(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "(payment_id IS NULL AND amount > 0) OR (payment_id IS NOT NULL AND amount < 0)",
+            "(payment_id IS NULL AND return_id IS NULL AND amount > 0) OR "
+            "(num_nonnulls(payment_id, return_id) = 1 AND amount < 0)",
             name="amount_matches_type",
         ),
         Index("ix_customer_ledger_entries_customer_id_id", "customer_id", "id"),
@@ -226,6 +232,6 @@ class CustomerLedgerEntry(Base):
             "uq_customer_ledger_entries_invoice_charge",
             "invoice_id",
             unique=True,
-            postgresql_where=text("payment_id IS NULL"),
+            postgresql_where=text("payment_id IS NULL AND return_id IS NULL"),
         ),
     )

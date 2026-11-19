@@ -16,7 +16,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -45,6 +44,7 @@ class LoyaltyAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     points_balance: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     lifetime_earned: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     lifetime_redeemed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    opening_points: Mapped[int] = mapped_column(BigInteger, server_default="0")
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
 
@@ -55,7 +55,7 @@ class LoyaltyAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "points_balance >= 0 AND lifetime_earned >= 0 AND lifetime_redeemed >= 0",
+            "lifetime_earned >= 0 AND lifetime_redeemed >= 0",
             name="points_non_negative",
         ),
         CheckConstraint(
@@ -75,6 +75,7 @@ class LoyaltyTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     invoice_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("invoices.id", ondelete="SET NULL")
     )
+    return_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("customer_returns.id"))
     ledger_sequence: Mapped[int] = mapped_column(BigInteger, Identity())
     transaction_type: Mapped[str] = mapped_column(String(16), nullable=False)
     points: Mapped[int] = mapped_column(
@@ -90,7 +91,6 @@ class LoyaltyTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint("points <> 0", name="points_non_zero"),
-        CheckConstraint("balance_after >= 0", name="balance_after_non_negative"),
         CheckConstraint(
             "transaction_type IN ('earn','redeem','reverse','adjust','expire')",
             name="type_valid",
@@ -101,11 +101,20 @@ class LoyaltyTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "transaction_type = 'adjust'",
             name="signed_points_match_type",
         ),
-        UniqueConstraint(
+        Index(
+            "uq_loyalty_transactions_original_invoice_type",
             "account_id",
             "invoice_id",
             "transaction_type",
-            name="uq_loyalty_transactions_account_invoice_type",
+            unique=True,
+            postgresql_where=text("return_id IS NULL"),
+        ),
+        Index(
+            "uq_loyalty_transactions_return_type",
+            "return_id",
+            "transaction_type",
+            unique=True,
+            postgresql_where=text("return_id IS NOT NULL"),
         ),
         Index("ix_loyalty_transactions_account_id_created_at", "account_id", "created_at"),
         Index(
