@@ -67,6 +67,8 @@ Run the PostgreSQL pytest suite, build the frontend, then run `../../scripts/ver
 | Static and build checks | Ruff `check` and `format --check` clean; OpenAPI contract regeneration purely additive (no routes or schemas removed); TypeScript, ESLint (`--max-warnings=0`) and the Next.js production build passed |
 | Browser printing workflow | English at 1440 px and Bangla at 375 px passed with no horizontal overflow |
 | End-to-end print pipeline | The real agent claimed 2 queued jobs, completed both, and produced an ESC/POS stream decoded to a 576-dot-wide, 1269-dot-tall bitmap with a partial cut — **bit-identical to the canonical invoice PDF** over all 1269 rows |
+| Migration round-trip | `04a62d5abb9c` downgrades to `f8bcc76b2f43` dropping all three tables, then re-applies with `kind` NOT NULL, nullable `invoice_id` and all five CHECK constraints |
+| Earlier-phase regression | Receipt (4 viewports, 80-line receipt), returns (both locales, zero scoped discrepancies) and purchasing (both locales) browser suites all pass against the modified invoice and settings pages |
 
 The captured stream (`escpos-stream.bin`) decodes to `printed-page.png`, which preserves Bengali shaping and is the physical-printing evidence available without a device.
 
