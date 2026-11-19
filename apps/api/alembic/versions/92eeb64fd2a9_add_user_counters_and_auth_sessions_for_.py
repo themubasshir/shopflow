@@ -5,15 +5,15 @@ Revises: b5667e724f7f
 Create Date: 2026-11-19 02:23:32.001158
 
 """
+
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-
-revision: str = '92eeb64fd2a9'
-down_revision: str | None = 'b5667e724f7f'
+revision: str = "92eeb64fd2a9"
+down_revision: str | None = "b5667e724f7f"
 branch_labels: str | None = None
 depends_on: str | None = None
 
@@ -26,11 +26,36 @@ def upgrade() -> None:
         sa.Column("user_id", UUID(as_uuid=True), nullable=False),
         sa.Column("counter_id", UUID(as_uuid=True), nullable=False),
         sa.Column("id", UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["shop_id"], ["shops.id"], name=op.f("fk_user_counters_shop_id_shops"), ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_user_counters_user_id_users"), ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["counter_id"], ["counters.id"], name=op.f("fk_user_counters_counter_id_counters"), ondelete="CASCADE"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["shop_id"],
+            ["shops.id"],
+            name=op.f("fk_user_counters_shop_id_shops"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["users.id"],
+            name=op.f("fk_user_counters_user_id_users"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["counter_id"],
+            ["counters.id"],
+            name=op.f("fk_user_counters_counter_id_counters"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_user_counters")),
         sa.UniqueConstraint("user_id", "counter_id", name="uq_user_counters_user_counter"),
     )
@@ -50,11 +75,36 @@ def upgrade() -> None:
         sa.Column("user_agent", sa.String(length=255), nullable=True),
         sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("id", UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["shop_id"], ["shops.id"], name=op.f("fk_auth_sessions_shop_id_shops"), ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_auth_sessions_user_id_users"), ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["counter_id"], ["counters.id"], name=op.f("fk_auth_sessions_counter_id_counters"), ondelete="SET NULL"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["shop_id"],
+            ["shops.id"],
+            name=op.f("fk_auth_sessions_shop_id_shops"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["users.id"],
+            name=op.f("fk_auth_sessions_user_id_users"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["counter_id"],
+            ["counters.id"],
+            name=op.f("fk_auth_sessions_counter_id_counters"),
+            ondelete="SET NULL",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_auth_sessions")),
         sa.UniqueConstraint("jti", name=op.f("uq_auth_sessions_jti")),
     )

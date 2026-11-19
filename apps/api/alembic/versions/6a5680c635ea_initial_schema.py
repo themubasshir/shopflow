@@ -8,8 +8,8 @@ Create Date: 2026-11-18 23:04:10.937942
 
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "6a5680c635ea"
@@ -486,7 +486,8 @@ def upgrade() -> None:
             name=op.f("ck_invoices_loyalty_points_non_negative"),
         ),
         sa.CheckConstraint(
-            "subtotal >= 0 AND discount_total >= 0 AND loyalty_discount >= 0 AND tax_total >= 0 AND total >= 0 AND paid_total >= 0 AND due_total >= 0",
+            "subtotal >= 0 AND discount_total >= 0 AND loyalty_discount >= 0 "
+            "AND tax_total >= 0 AND total >= 0 AND paid_total >= 0 AND due_total >= 0",
             name=op.f("ck_invoices_totals_non_negative"),
         ),
         sa.ForeignKeyConstraint(
@@ -887,7 +888,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.CheckConstraint(
-            "(transaction_type IN ('earn','redeem') AND points > 0) OR (transaction_type IN ('reverse','expire') AND points < 0) OR transaction_type = 'adjust'",
+            "(transaction_type IN ('earn','redeem') AND points > 0) OR "
+            "(transaction_type IN ('reverse','expire') AND points < 0) OR "
+            "transaction_type = 'adjust'",
             name=op.f("ck_loyalty_transactions_signed_points_match_type"),
         ),
         sa.CheckConstraint(
@@ -1030,7 +1033,8 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.CheckConstraint(
-            "movement_type IN ('opening','purchase','sale','return','adjustment','damage','transfer')",
+            "movement_type IN ('opening','purchase','sale','return','adjustment',"
+            "'damage','transfer')",
             name=op.f("ck_stock_movements_movement_type_valid"),
         ),
         sa.CheckConstraint("quantity <> 0", name=op.f("ck_stock_movements_quantity_non_zero")),

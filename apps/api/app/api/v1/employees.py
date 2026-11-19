@@ -289,9 +289,7 @@ def _assign_counters(
         if bad:
             raise ValidationError("Unknown counter", details={"counter_ids": [str(c) for c in bad]})
     # Replace the assignment set.
-    for row in db.scalars(
-        select(UserCounter).where(UserCounter.user_id == user.id)
-    ).all():
+    for row in db.scalars(select(UserCounter).where(UserCounter.user_id == user.id)).all():
         db.delete(row)
     for cid in counter_ids:
         db.add(UserCounter(shop_id=user.shop_id, user_id=user.id, counter_id=cid))

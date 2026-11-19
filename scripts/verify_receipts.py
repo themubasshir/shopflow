@@ -37,6 +37,10 @@ ROOT = Path(__file__).resolve().parents[1]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 
+# Reuse the pytest fixture helpers so browser fixtures reconcile identically.
+sys.path.insert(0, str(API / "tests"))
+from fixtures import post_opening_stock  # noqa: E402
+
 
 def test_engine():
     explicit = os.getenv("SHOPFLOW_TEST_DATABASE_URL")
@@ -116,10 +120,15 @@ def fixtures(db: Session):
         name="Amina Rahman",
         name_bn="আমিনা রহমান",
         phone=f"+88016{uuid4().int % 100000000:08d}",
-        loyalty_account=LoyaltyAccount(shop_id=shop.id, points_balance=400, lifetime_earned=400),
+        loyalty_account=LoyaltyAccount(
+            shop_id=shop.id, points_balance=400, lifetime_earned=400, opening_points=400
+        ),
     )
     products = [goods, medicine, *large]
     db.add_all([*products, customer])
+    db.flush()
+    # Physical projections are seeded directly; reconcile the ledgers.
+    post_opening_stock(db, *products)
     db.commit()
     return (
         {

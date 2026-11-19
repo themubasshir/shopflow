@@ -54,6 +54,7 @@ from app.services import billing
 from app.services.billing import finalize_invoice
 from app.services.customers import create_customer, update_customer
 from app.services.receivables import CreditLimitError, OverpaymentError, collect_due_payment
+from fixtures import post_opening_stock, set_opening_points
 
 # ---------------------------------------------------------------- fixtures
 
@@ -157,6 +158,9 @@ def make_product(shop):
                 is_base=True,
             )
             db.add(u)
+            db.flush()
+            # The physical projection is seeded directly; reconcile the ledger.
+            post_opening_stock(db, p)
             db.commit()
             created.append(p.id)
             return p, u
@@ -342,8 +346,15 @@ def test_rollback_on_failure(manager_principal, counter, make_product):
         _create(manager_principal, body)
     assert _stock(p.id) == Decimal("3")
     with _session() as db:
+        # The failed invoice must not write a sale movement; the fixture's own
+        # opening movement is expected.
         assert (
-            db.scalar(select(func.count(StockMovement.id)).where(StockMovement.product_id == p.id))
+            db.scalar(
+                select(func.count(StockMovement.id)).where(
+                    StockMovement.product_id == p.id,
+                    StockMovement.movement_type == "sale",
+                )
+            )
             == 0
         )
 
@@ -550,15 +561,7 @@ def account_customer(manager_principal):
                 select(LoyaltyAccount).where(LoyaltyAccount.customer_id == customer.id)
             )
             if points:
-                account.points_balance = account.lifetime_earned = points
-                db.add(
-                    LoyaltyTransaction(
-                        account_id=account.id,
-                        transaction_type="earn",
-                        points=points,
-                        balance_after=points,
-                    )
-                )
+                set_opening_points(account, points)
                 db.commit()
             return customer.id, account.id
 
@@ -662,7 +665,8 @@ def test_redeem_at_exactly_300_and_award_only_on_eligible_net(
             ("redeem", -100, 200),
             ("earn", 2, 202),
         ]
-        assert db.get(LoyaltyAccount, account).points_balance == sum(
+        saved = db.get(LoyaltyAccount, account)
+        assert saved.points_balance == saved.opening_points + sum(
             db.scalars(
                 select(LoyaltyTransaction.points).where(LoyaltyTransaction.account_id == account)
             )
@@ -820,7 +824,12 @@ def test_redemption_rolls_back_with_flushed_invoice_stock_and_ledger(
             is None
         )
         assert (
-            db.scalar(select(StockMovement).where(StockMovement.product_id == product[0].id))
+            db.scalar(
+                select(StockMovement).where(
+                    StockMovement.product_id == product[0].id,
+                    StockMovement.movement_type == "sale",
+                )
+            )
             is None
         )
 

@@ -21,6 +21,7 @@ from app.models import (
     StockMovement,
 )
 from app.services.receipts import mask_customer_phone
+from fixtures import post_opening_stock, set_opening_points
 
 
 @pytest.mark.parametrize(
@@ -90,6 +91,9 @@ def catalog():
             units=[ProductUnit(name="pack", name_bn="প্যাক", is_base=True, selling_price="300.00")],
         )
         db.add_all([goods, medicine])
+        db.flush()
+        # Physical projections are seeded directly; reconcile the ledgers.
+        post_opening_stock(db, goods, medicine)
         db.commit()
         products = (goods.id, medicine.id)
         yield shop.id, [counter.id for counter in counters], products
@@ -158,7 +162,7 @@ async def test_saved_receipt_stability_privacy_rounding_and_tender(client, catal
     customer_id = UUID(result.json()["id"])
     with SessionLocal() as db:
         account = db.scalar(select(LoyaltyAccount).where(LoyaltyAccount.customer_id == customer_id))
-        account.points_balance = account.lifetime_earned = 400
+        set_opening_points(account, 400)
         db.commit()
     original = await sale(
         client,
