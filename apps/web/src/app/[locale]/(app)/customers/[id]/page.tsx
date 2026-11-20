@@ -71,8 +71,8 @@ export default async function CustomerPage({ params, searchParams }: {
         </Card>}
         {balance && <Card>
           <p className="flex items-center gap-2 text-sm font-medium"><Wallet size={18} aria-hidden="true" />{t("outstanding")}</p>
-          <p className="my-2 text-2xl font-bold tabular-nums">{formatBDT(balance.outstanding_due)}</p>
-          <p className="text-sm text-[var(--color-muted-foreground)]">{t("creditLimit")} · {Number(customer.credit_limit) > 0 ? formatBDT(customer.credit_limit) : t("unlimited")}</p>
+          <p className="my-2 text-2xl font-bold tabular-nums">{formatBDT(balance.outstanding_due, locale)}</p>
+          <p className="text-sm text-[var(--color-muted-foreground)]">{t("creditLimit")} · {Number(customer.credit_limit) > 0 ? formatBDT(customer.credit_limit, locale) : t("unlimited")}</p>
         </Card>}
       </div>
       {tab && transactions && (
@@ -106,15 +106,15 @@ export default async function CustomerPage({ params, searchParams }: {
                         {t.has(`loyaltyTypes.${row.transaction_type}`) ? t(`loyaltyTypes.${row.transaction_type}`) : row.transaction_type}
                       </Badge>
                     ) : (
-                      <p className="text-sm font-semibold tabular-nums">{formatBDT(row.amount)}</p>
+                      <p className="text-sm font-semibold tabular-nums">{formatBDT(row.amount, locale)}</p>
                     )}
                   </div>
                   {"payment_status" in row ? (
                     <>
                       <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm tabular-nums">
-                        <span>{t("total")} · {formatBDT(row.total)}</span>
-                        <span>{t("paid")} · {formatBDT(row.paid_total)}</span>
-                        <span>{t("due")} · {formatBDT(row.due_total)}</span>
+                        <span>{t("total")} · {formatBDT(row.total, locale)}</span>
+                        <span>{t("paid")} · {formatBDT(row.paid_total, locale)}</span>
+                        <span>{t("due")} · {formatBDT(row.due_total, locale)}</span>
                       </p>
                       {hasSales && row.status !== "draft" && (
                         <Link href={`/invoices/${row.id}`} className={secondaryButton}>{receiptsText("open")}</Link>
@@ -126,7 +126,7 @@ export default async function CustomerPage({ params, searchParams }: {
                   ) : "transaction_type" in row ? (
                     <p className="text-sm tabular-nums">{row.points > 0 ? "+" : ""}{row.points} · {t("pointsBalance")} {row.balance_after}</p>
                   ) : (
-                    <p className="text-sm tabular-nums">{t(row.return_id ? "returnEntry" : row.payment_id ? "collectionEntry" : "chargeEntry")} · {t("outstanding")} {formatBDT(row.balance_after)}</p>
+                    <p className="text-sm tabular-nums">{t(row.return_id ? "returnEntry" : row.payment_id ? "collectionEntry" : "chargeEntry")} · {t("outstanding")} {formatBDT(row.balance_after, locale)}</p>
                   )}
                 </Card>
               </li>

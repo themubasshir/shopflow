@@ -7,18 +7,57 @@ const numberFormatter = new Intl.NumberFormat("en-BD", {
   maximumFractionDigits: 2,
 });
 
-/** Format a Decimal string from the API as BDT. Always Latin digits for POS legibility. */
-export function formatBDT(value: string | number | null | undefined): string {
-  if (value == null || value === "") return "৳0";
-  const n = typeof value === "string" ? parseFloat(value) : value;
-  if (Number.isNaN(n)) return "৳0";
-  return `৳${bdtFormatter.format(n)}`;
+const quantityFormatter = new Intl.NumberFormat("en-BD", {
+  maximumFractionDigits: 3,
+});
+
+const bnNumberFormatter = new Intl.NumberFormat("bn-BD", {
+  maximumFractionDigits: 2,
+});
+
+const bnQuantityFormatter = new Intl.NumberFormat("bn-BD", {
+  maximumFractionDigits: 3,
+});
+
+const bnBdtFormatter = new Intl.NumberFormat("bn-BD", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+/**
+ * Convert Latin digits in a formatted string to Bengali digits. Used when the
+ * UI locale is Bangla so amounts like ৳25 render as ৳২৫.
+ */
+export function bengaliDigits(value: string): string {
+  return value.replace(/[0-9]/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)]);
 }
 
-export function formatNumber(value: string | number | null | undefined): string {
-  if (value == null || value === "") return "0";
+function isBn(locale?: string): boolean {
+  return locale === "bn";
+}
+
+/** Format a Decimal string from the API as BDT. Bangla locale ⇒ Bengali digits. */
+export function formatBDT(
+  value: string | number | null | undefined,
+  locale = "en",
+): string {
+  if (value == null || value === "") return isBn(locale) ? "৳০" : "৳0";
   const n = typeof value === "string" ? parseFloat(value) : value;
-  return numberFormatter.format(Number.isNaN(n) ? 0 : n);
+  if (Number.isNaN(n)) return isBn(locale) ? "৳০" : "৳0";
+  return isBn(locale)
+    ? `৳${bnBdtFormatter.format(n)}`
+    : `৳${bdtFormatter.format(n)}`;
+}
+
+export function formatNumber(
+  value: string | number | null | undefined,
+  locale = "en",
+): string {
+  if (value == null || value === "") return isBn(locale) ? "০" : "0";
+  const n = typeof value === "string" ? parseFloat(value) : value;
+  return (isBn(locale) ? bnNumberFormatter : numberFormatter).format(
+    Number.isNaN(n) ? 0 : n,
+  );
 }
 
 export function formatDate(iso: string | null | undefined, locale = "en"): string {
@@ -49,8 +88,8 @@ export function localizedName(
   return nameEn ?? nameBn ?? "";
 }
 
-const quantityFormatter = new Intl.NumberFormat("en-BD", { maximumFractionDigits: 3 });
-
-export function formatQuantity(value: string | number): string {
-  return quantityFormatter.format(Number(value));
+export function formatQuantity(value: string | number, locale = "en"): string {
+  return (isBn(locale) ? bnQuantityFormatter : quantityFormatter).format(
+    Number(value),
+  );
 }

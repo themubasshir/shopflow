@@ -212,6 +212,25 @@ def update_category(
     return catalog_service.save_category(db, principal, body, category_id)
 
 
+@router.patch("/categories/{category_id}/state", response_model=CategoryManageOut)
+def set_category_state(
+    category_id: uuid.UUID,
+    body: ProductStateWrite,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> CategoryManageOut:
+    return catalog_service.set_category_active(db, principal, category_id, body.is_active)
+
+
+@router.delete("/categories/{category_id}", status_code=204)
+def delete_category(
+    category_id: uuid.UUID,
+    principal: Principal = Depends(get_authenticated_principal),
+    db: Session = Depends(get_db),
+) -> None:
+    catalog_service.delete_category(db, principal, category_id)
+
+
 # --- Bulk import --------------------------------------------------------------
 
 

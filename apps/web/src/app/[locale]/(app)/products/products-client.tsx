@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { PackagePlus, Pencil, Search, Upload } from "lucide-react";
+import { PackagePlus, Pencil, Power, PowerOff, Search, Trash2, Upload } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
 import { browserRequest, fieldErrors } from "@/lib/api-client";
 import {
@@ -141,9 +141,9 @@ export function ProductsClient({
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <div className="text-right">
-                        <p className="text-sm font-semibold">{formatBDT(p.price)}</p>
+                        <p className="text-sm font-semibold">{formatBDT(p.price, locale)}</p>
                         <p className="text-xs text-[var(--color-muted-foreground)]">
-                          {t("stock")}: {formatQuantity(p.stock_on_hand)}
+                          {t("stock")}: {formatQuantity(p.stock_on_hand, locale)}
                         </p>
                       </div>
                       <Badge variant={p.is_medicine ? "warning" : "default"}>
@@ -453,6 +453,9 @@ function CategoriesTab({ categories }: { categories: CategoryManageOut[] }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<CategoryManageOut | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -464,18 +467,24 @@ function CategoriesTab({ categories }: { categories: CategoryManageOut[] }) {
       slug: String(f.get("slug")).trim().toLowerCase(),
       parent_id: String(f.get("parent_id")) || null,
       is_medicine: f.get("is_medicine") === "on",
-      loyalty_eligible: true,
+      loyalty_eligible: editing ? editing.loyalty_eligible : true,
       sort_order: Number(localDigits(String(f.get("sort_order")).trim()) || "0"),
-      is_active: true,
+      is_active: editing ? editing.is_active : true,
     };
     setSaving(true);
     try {
-      await browserRequest<CategoryManageOut>("/api/catalog-ops/catalog/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      (e.target as HTMLFormElement).reset();
+      await browserRequest<CategoryManageOut>(
+        editing
+          ? `/api/catalog-ops/catalog/categories/${editing.id}`
+          : "/api/catalog-ops/catalog/categories",
+        {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      formRef.current?.reset();
+      setEditing(null);
       router.refresh();
     } catch (err) {
       const code = errorCode(err);
@@ -485,27 +494,73 @@ function CategoriesTab({ categories }: { categories: CategoryManageOut[] }) {
     }
   }
 
+  async function setActive(c: CategoryManageOut, active: boolean) {
+    setError("");
+    setBusy(c.id);
+    try {
+      await browserRequest<CategoryManageOut>(
+        `/api/catalog-ops/catalog/categories/${c.id}/state`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_active: active }),
+        },
+      );
+      router.refresh();
+    } catch {
+      setError("unknown");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(c: CategoryManageOut) {
+    setError("");
+    setBusy(c.id);
+    try {
+      await browserRequest(`/api/catalog-ops/catalog/categories/${c.id}`, {
+        method: "DELETE",
+      });
+      if (editing?.id === c.id) setEditing(null);
+      router.refresh();
+    } catch {
+      setError("deleteBlocked");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const canDelete = (c: CategoryManageOut) =>
+    c.product_count === 0 && !categories.some((x) => x.parent_id === c.id);
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
-        <h3 className="mb-3 font-semibold">{t("add")}</h3>
-        <form onSubmit={save} className="grid gap-3">
-          <input name="name_en" placeholder={t("name_en")} required className={fieldClass} />
-          <input name="name_bn" placeholder={t("name_bn")} required className={fieldClass} />
-          <input name="slug" placeholder={t("slugHint")} required className={fieldClass} />
-          <select name="parent_id" className={fieldClass} defaultValue="">
+        <h3 className="mb-3 font-semibold">{t(editing ? "edit" : "add")}</h3>
+        <form ref={formRef} key={editing?.id ?? "new"} onSubmit={save} className="grid gap-3">
+          <input name="name_en" placeholder={t("name_en")} required className={fieldClass} defaultValue={editing?.name_en} />
+          <input name="name_bn" placeholder={t("name_bn")} required className={fieldClass} defaultValue={editing?.name_bn} />
+          <input name="slug" placeholder={t("slugHint")} required className={fieldClass} defaultValue={editing?.slug} />
+          <select name="parent_id" className={fieldClass} defaultValue={editing?.parent_id ?? ""}>
             <option value="">{t("noParent")}</option>
-            {categories.map((c) => (
+            {categories.filter((c) => c.id !== editing?.id).map((c) => (
               <option key={c.id} value={c.id}>{c.name_en}</option>
             ))}
           </select>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="is_medicine" className="h-5 w-5" />
+            <input type="checkbox" name="is_medicine" defaultChecked={editing?.is_medicine} className="h-5 w-5" />
             {t("isMedicine")}
           </label>
-          <input name="sort_order" inputMode="numeric" placeholder={t("sortOrder")} defaultValue="0" className={fieldClass} />
+          <input name="sort_order" inputMode="numeric" placeholder={t("sortOrder")} defaultValue={editing ? String(editing.sort_order) : "0"} className={fieldClass} />
           {error && <p role="alert" className="text-sm text-red-700">{t(`errors.${error}` as never)}</p>}
-          <button className={primaryButton} disabled={saving}>{t("save")}</button>
+          <div className="flex gap-2">
+            <button className={primaryButton} disabled={saving}>{t(editing ? "saveEdit" : "save")}</button>
+            {editing && (
+              <button type="button" className={secondaryButton} disabled={saving} onClick={() => { setEditing(null); formRef.current?.reset(); }}>
+                {tUnits("cancel")}
+              </button>
+            )}
+          </div>
         </form>
       </Card>
       <Card>
@@ -515,11 +570,30 @@ function CategoriesTab({ categories }: { categories: CategoryManageOut[] }) {
         ) : (
           <ul className="divide-y divide-[var(--color-border)]">
             {categories.map((c) => (
-              <li key={c.id} className="flex items-center justify-between py-2 text-sm">
-                <span>{c.name_en} <span className="text-xs text-[var(--color-muted-foreground)]">({c.slug})</span></span>
-                <span className="text-xs text-[var(--color-muted-foreground)]">
-                  {c.product_count} {tUnits("title").toLowerCase()}
-                  {c.is_medicine ? ` · ${tUnits("medicine")}` : ""}
+              <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                <span className={c.is_active ? "" : "line-through opacity-60"}>
+                  {c.name_en} <span className="text-xs text-[var(--color-muted-foreground)]">({c.slug})</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-xs text-[var(--color-muted-foreground)]">
+                    {c.product_count} {tUnits("title").toLowerCase()}
+                    {c.is_medicine ? ` · ${tUnits("medicine")}` : ""}
+                    {!c.is_active ? ` · ${tUnits("inactive")}` : ""}
+                  </span>
+                  <button type="button" className={secondaryButton} disabled={busy === c.id}
+                    onClick={() => setEditing(c)} aria-label={t("edit")}>
+                    <Pencil size={14} aria-hidden="true" />
+                  </button>
+                  <button type="button" className={secondaryButton} disabled={busy === c.id}
+                    onClick={() => setActive(c, !c.is_active)} aria-label={c.is_active ? tUnits("deactivate") : tUnits("activate")}>
+                    {c.is_active ? <PowerOff size={14} aria-hidden="true" /> : <Power size={14} aria-hidden="true" />}
+                  </button>
+                  {canDelete(c) && (
+                    <button type="button" className={secondaryButton} disabled={busy === c.id}
+                      onClick={() => remove(c)} aria-label={tUnits("delete")}>
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  )}
                 </span>
               </li>
             ))}

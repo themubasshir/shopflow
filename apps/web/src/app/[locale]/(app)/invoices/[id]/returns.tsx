@@ -14,6 +14,7 @@ const choiceKey = (row: ReturnChoice) => row.invoice_item_id + (row.batch_id ?? 
 
 export function ReturnPanel({ invoiceId, canWrite }: { invoiceId: string; canWrite: boolean }) {
   const t = useTranslations("returns");
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [revision, setRevision] = useState(0);
   const refresh = () => setRevision((n) => n + 1);
@@ -30,7 +31,7 @@ export function ReturnPanel({ invoiceId, canWrite }: { invoiceId: string; canWri
       {open && <>
         <FetchStatus loading={info.loading} error={info.error} />
         {returnData && <div className="space-y-4">
-          <p className="text-sm">{t("outstanding")} <strong>{formatBDT(returnData.outstanding_due)}</strong></p>
+          <p className="text-sm">{t("outstanding")} <strong>{formatBDT(returnData.outstanding_due, locale)}</strong></p>
           {canWrite && choices.length > 0 && <RequestForm path={path} choices={choices} refresh={refresh} />}
           {!choices.length && <p className="text-sm">{t("noneRemaining")}</p>}
           <section className="space-y-3">
@@ -105,7 +106,7 @@ function Choice({ row }: { row: ReturnChoice }) {
   return (
     <div className="min-w-0 space-y-2 rounded-lg border border-[var(--color-border)] p-3">
       <h3 className="break-words text-sm font-semibold">{label}</h3>
-      <p className="text-sm">{t("remaining", { qty: formatQuantity(row.remaining), unit: t.has("units." + row.base_unit) ? t("units." + row.base_unit) : row.base_unit })}</p>
+      <p className="text-sm">{t("remaining", { qty: formatQuantity(row.remaining, locale), unit: t.has("units." + row.base_unit) ? t("units." + row.base_unit) : row.base_unit })}</p>
       {row.expiry_date && <p className="text-sm">{t("expiry")} {row.expiry_date}</p>}
       {row.medicine && !row.can_restore && <p className="text-sm text-red-700">{t("restorationBlocked")}</p>}
       <Field name={key} label={t("quantityFor", { name: label })} kind="decimal" />
@@ -134,14 +135,14 @@ function HistoryCard({ row, choices, path, canWrite, refresh }: {
     <article className="space-y-3 rounded-lg border border-[var(--color-border)] p-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-semibold">{formatBDT(row.amount)} · {formatDate(row.created_at, locale)}</p>
+          <p className="font-semibold">{formatBDT(row.amount, locale)} · {formatDate(row.created_at, locale)}</p>
           <p className="break-words text-sm">{row.reason}</p>
         </div>
         <Badge variant={row.refund_status === "completed" ? "success" : "outline"}>{t("status." + row.refund_status)}</Badge>
       </header>
       <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
         {([
-          ["dueReduction", formatBDT(row.due_reduction)], ["refundAmount", formatBDT(row.refund_amount)],
+          ["dueReduction", formatBDT(row.due_reduction, locale)], ["refundAmount", formatBDT(row.refund_amount, locale)],
           ["pointsReversed", row.earned_reversed], ["pointsRestored", row.redeemed_restored],
         ] as const).map(([name, amount]) => <div key={name}><dt>{t(name)}</dt><dd className="font-semibold">{amount}</dd></div>)}
       </dl>
@@ -155,7 +156,7 @@ function HistoryCard({ row, choices, path, canWrite, refresh }: {
         const original = choices.find((item) => item.invoice_item_id === line.invoice_item_id && item.batch_id === line.batch_id);
         return <div className="space-y-2 border-t border-[var(--color-border)] pt-2 text-sm" key={line.id}>
           <p className="break-words font-medium">
-            {formatQuantity(line.quantity)} · {original ? localizedName(original.description, original.name_bn, locale) : ""}
+            {formatQuantity(line.quantity, locale)} · {original ? localizedName(original.description, original.name_bn, locale) : ""}
             {original?.batch_number ? " · " + original.batch_number : ""}
           </p>
           <p>{t("dispositions." + line.disposition)}{line.stock_traced ? "" : " · " + t("noProvenance")}</p>

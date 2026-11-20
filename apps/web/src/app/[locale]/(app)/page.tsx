@@ -69,7 +69,7 @@ export default async function DashboardPage({
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             <KpiCard
               title={t("todaySales")}
-              value={formatBDT(summary!.today_sales)}
+              value={formatBDT(summary!.today_sales, locale)}
               icon={Banknote}
             />
             <KpiCard
@@ -79,7 +79,7 @@ export default async function DashboardPage({
             />
             <KpiCard
               title={t("averageBill")}
-              value={formatBDT(summary!.average_bill)}
+              value={formatBDT(summary!.average_bill, locale)}
               icon={Banknote}
               iconBg="bg-sky-100 text-sky-700"
             />
@@ -124,7 +124,7 @@ export default async function DashboardPage({
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-semibold tabular-nums">{formatBDT(c.total_sales)}</p>
+                      <p className="text-sm font-semibold tabular-nums">{formatBDT(c.total_sales, locale)}</p>
                       <Badge variant={c.is_busy ? "success" : "outline"}>
                         {c.is_busy ? tCounters("busy") : tCounters("idle")}
                       </Badge>
@@ -255,7 +255,7 @@ export default async function DashboardPage({
                           </Badge>
                         </td>
                         <td className="py-2.5 text-right font-semibold tabular-nums">
-                          {formatBDT(tx.total)}
+                          {formatBDT(tx.total, locale)}
                         </td>
                       </tr>
                     ))}

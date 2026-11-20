@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { ApiError, browserRequest, newIdempotencyKey } from "@/lib/api-client";
 import { errorCode, fieldClass, minorUnits, primaryButton, secondaryButton } from "@/components/ui/pos-form";
@@ -10,6 +10,7 @@ import type { DuePaymentCreate, DuePaymentOut, InvoiceOut } from "@/types";
 
 export function DuePaymentForm({ customerId, invoice }: { customerId: string; invoice: InvoiceOut }) {
   const t = useTranslations("customers");
+  const locale = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -65,7 +66,7 @@ export function DuePaymentForm({ customerId, invoice }: { customerId: string; in
   return (
     <>
       {success && <p className="mt-2 text-sm text-[var(--color-primary-strong)]" role="status">{t("paymentRecorded", {
-        amount: formatBDT(success.amount), outstanding: formatBDT(success.outstanding),
+        amount: formatBDT(success.amount, locale), outstanding: formatBDT(success.outstanding, locale),
       })}</p>}
       {!open && Number(invoice.due_total) > 0 && (
         <button className={secondaryButton} onClick={() => { setError(""); setSuccess(null); setOpen(true); }}>{t("collect")}</button>

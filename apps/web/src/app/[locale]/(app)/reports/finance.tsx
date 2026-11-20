@@ -58,7 +58,7 @@ export function FinancePanel() {
                 <dt>{t("metrics." + field)}</dt>
                 <dd className="break-words font-semibold tabular-nums">{group === "loyalty"
                   ? new Intl.NumberFormat(locale === "bn" ? "bn-BD-u-nu-latn" : "en-BD").format(Number(financial.data?.[field]))
-                  : formatBDT(financial.data?.[field])}</dd>
+                  : formatBDT(financial.data?.[field], locale)}</dd>
               </div>)}
             </dl>
           </section>)}
@@ -81,7 +81,7 @@ export function FinancePanel() {
           {check.data.items.map((row) => <article key={row.entity_id + row.check} className="space-y-2 rounded-lg border border-[var(--color-border)] p-3 text-sm">
             <p className="font-semibold">{t("areas." + row.area)} · {t.has("checks." + row.check) ? t("checks." + row.check) : row.check}</p>
             <p className="break-all font-mono text-xs">{row.entity_id}</p>
-            <p>{t("comparison", { expected: formatQuantity(row.expected), actual: formatQuantity(row.actual) })}</p>
+            <p>{t("comparison", { expected: formatQuantity(row.expected, locale), actual: formatQuantity(row.actual, locale) })}</p>
           </article>)}
           <Pager {...check.data} offset={offset} setOffset={setOffset} />
         </>}

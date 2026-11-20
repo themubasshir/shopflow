@@ -1,5 +1,5 @@
 import { getLocale, getTranslations } from "next-intl/server";
-import { ArrowLeft, Printer, Search } from "lucide-react";
+import { ArrowLeft, Download, Printer, Search } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { api } from "@/lib/api";
 import { formatBDT, formatDate } from "@/lib/format";
@@ -43,15 +43,25 @@ export default async function InvoiceHistory({ searchParams }: {
                   <p className="font-semibold">{invoice.invoice_number}</p>
                   <p className="text-sm text-[var(--color-muted-foreground)]">{formatDate(invoice.finalized_at ?? invoice.created_at, locale)} · {invoice.counter_code}</p>
                   <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <strong>{formatBDT(invoice.total)}</strong>
+                    <strong>{formatBDT(invoice.total, locale)}</strong>
                     <Badge variant={invoice.status === "finalized" && invoice.payment_status === "paid" ? "success" : "warning"}>
                       {invoice.status === "finalized" ? customer("paymentStatus." + invoice.payment_status) : t("status." + invoice.status)}
                     </Badge>
                   </div>
                 </div>
-                <Link href={`/invoices/${invoice.id}`} className={secondaryButton}>
-                  <Printer size={16} aria-hidden="true" />{t("preview")}
-                </Link>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <a
+                    href={`/api/invoices/${invoice.id}/receipt?format=pdf&lang=${locale}`}
+                    download
+                    className={secondaryButton}
+                    aria-label={t("download")}
+                  >
+                    <Download size={16} aria-hidden="true" />{t("download")}
+                  </a>
+                  <Link href={`/invoices/${invoice.id}`} className={secondaryButton}>
+                    <Printer size={16} aria-hidden="true" />{t("preview")}
+                  </Link>
+                </div>
               </Card>
             </li>
           ))}

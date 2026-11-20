@@ -338,6 +338,61 @@ def test_category_create_and_cycle_prevention(setup):
             )
 
 
+def test_category_update_and_deactivate(setup):
+    actor, _, _, _ = setup
+    suf = uuid4().hex[:8]
+    with SessionLocal() as db:
+        cat = catalog_service.save_category(
+            db, actor,
+            CategoryWrite(name_en="Snacks", name_bn="স্ন্যাকস", slug=f"snacks-{suf}"),
+        )
+        updated = catalog_service.save_category(
+            db, actor,
+            CategoryWrite(name_en="Snacks & Drinks", name_bn="স্ন্যাকস ও পানীয়",
+                          slug=f"snacks-{suf}"),
+            cat.id,
+        )
+        assert updated.name_en == "Snacks & Drinks"
+        off = catalog_service.set_category_active(db, actor, cat.id, False)
+        assert off.is_active is False
+        on = catalog_service.set_category_active(db, actor, cat.id, True)
+        assert on.is_active is True
+
+
+def test_category_delete_blocked_with_products(setup):
+    actor, categories, _, _ = setup
+    # 'grocery' holds seeded products -> cannot delete
+    with SessionLocal() as db, pytest.raises(ValidationError):
+        catalog_service.delete_category(db, actor, categories["grocery"])
+
+
+def test_category_delete_empty_and_child_blocked(setup):
+    actor, _, _, _ = setup
+    suf = uuid4().hex[:8]
+    with SessionLocal() as db:
+        parent = catalog_service.save_category(
+            db, actor,
+            CategoryWrite(name_en="P", name_bn="পি", slug=f"parent-{suf}"),
+        )
+        catalog_service.save_category(
+            db, actor,
+            CategoryWrite(name_en="C", name_bn="সি", slug=f"child-{suf}",
+                          parent_id=parent.id),
+        )
+        # parent has a child -> cannot delete
+        with pytest.raises(ValidationError):
+            catalog_service.delete_category(db, actor, parent.id)
+        # an empty standalone category CAN be deleted
+        lone = catalog_service.save_category(
+            db, actor,
+            CategoryWrite(name_en="Lone", name_bn="একক", slug=f"lone-{suf}"),
+        )
+        catalog_service.delete_category(db, actor, lone.id)
+        assert db.scalar(
+            select(Category).where(Category.id == lone.id)
+        ) is None
+
+
 # --- authorization -------------------------------------------------------------
 
 

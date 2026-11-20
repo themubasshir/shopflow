@@ -162,6 +162,58 @@ def list_managed_categories(db: Session, principal: Principal) -> list[CategoryM
     return [_category_out(db, c) for c in cats]
 
 
+def set_category_active(
+    db: Session, principal: Principal, category_id: UUID, active: bool
+) -> CategoryManageOut:
+    """Activate / deactivate a category. Deactivating hides it from pickers and
+    the billing search without losing product history."""
+    principal.require_write("catalog:write")
+    try:
+        cat = _category_by_id(db, principal.shop_id, category_id)
+        cat.is_active = active
+        audit(
+            db, principal,
+            "category.activate" if active else "category.deactivate",
+            "category", cat.id, is_active=active,
+        )
+        db.commit()
+        return _category_out(db, cat)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def delete_category(db: Session, principal: Principal, category_id: UUID) -> None:
+    """Hard-delete a category only when nothing references it. A category that
+    still owns products or child categories must be deactivated or emptied
+    first, so historical product/category links are never silently severed."""
+    principal.require_write("catalog:write")
+    try:
+        cat = _category_by_id(db, principal.shop_id, category_id)
+        products = db.scalar(
+            select(func.count(Product.id)).where(Product.category_id == category_id)
+        ) or 0
+        if products:
+            raise ValidationError(
+                f"Category has {products} product(s); "
+                "reassign them or deactivate the category instead"
+            )
+        children = db.scalar(
+            select(func.count(Category.id)).where(Category.parent_id == category_id)
+        ) or 0
+        if children:
+            raise ValidationError(
+                f"Category has {children} sub-categories; move them first"
+            )
+        slug = cat.slug
+        db.delete(cat)
+        audit(db, principal, "category.delete", "category", category_id, slug=slug)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
 # ---------------------------------------------------------------------------
 # Product unit validation
 # ---------------------------------------------------------------------------

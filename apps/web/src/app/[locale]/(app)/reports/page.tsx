@@ -82,7 +82,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
                           </Badge>
                         ) : "—"}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatBDT(tx.total)}</td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatBDT(tx.total, locale)}</td>
                     </tr>
                   ))}
                 </tbody>

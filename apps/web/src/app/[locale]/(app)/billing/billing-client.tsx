@@ -330,10 +330,10 @@ export function BillingClient({
                         {localizedName(p.name_en, p.name_bn, locale)}
                       </p>
                       <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-                        {p.sku} · {formatNumber(p.stock_on_hand)} {p.unit}
+                        {p.sku} · {formatNumber(p.stock_on_hand, locale)} {p.unit}
                       </p>
                       <p className="mt-1 text-base font-bold text-[var(--color-primary)]">
-                        {formatBDT(p.price)}
+                        {formatBDT(p.price, locale)}
                       </p>
                     </button>
                   );
@@ -418,7 +418,7 @@ export function BillingClient({
                     {localizedName(l.product.name_en, l.product.name_bn, locale)}
                   </p>
                   <p className="text-xs text-[var(--color-muted-foreground)]">
-                    {formatBDT(l.product.price)} {t("each")}
+                    {formatBDT(l.product.price, locale)} {t("each")}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -451,7 +451,7 @@ export function BillingClient({
                   </button>
                 </div>
                 <p className="min-w-12 text-right text-sm font-bold tabular-nums">
-                  {formatBDT(parseDecimal(l.product.price) * l.qty)}
+                  {formatBDT(parseDecimal(l.product.price) * l.qty, locale)}
                 </p>
               </li>
             ))}
@@ -494,19 +494,19 @@ export function BillingClient({
         <dl className="mt-4 space-y-2 border-t border-[var(--color-border)] pt-4 text-sm">
           <div className="flex justify-between">
             <dt>{t("subtotal")}</dt>
-            <dd className="tabular-nums">{formatBDT(subtotal)}</dd>
+            <dd className="tabular-nums">{formatBDT(subtotal, locale)}</dd>
           </div>
           <div className="flex justify-between">
             <dt>{t("discount")}</dt>
-            <dd className="tabular-nums text-red-600">−{formatBDT(discountNum)}</dd>
+            <dd className="tabular-nums text-red-600">−{formatBDT(discountNum, locale)}</dd>
           </div>
           {!redemptionInvalid && redeemPoints > 0 && <div className="flex justify-between gap-2">
-            <dt>{t("loyaltyDiscount")}</dt><dd className="tabular-nums">−{formatBDT(redeemPoints)}</dd>
+            <dt>{t("loyaltyDiscount")}</dt><dd className="tabular-nums">−{formatBDT(redeemPoints, locale)}</dd>
           </div>}
           <div className="flex justify-between text-base font-bold">
             <dt>{t("total")}</dt>
             <dd className="tabular-nums text-[var(--color-primary)]">
-              {formatBDT(total)}
+              {formatBDT(total, locale)}
             </dd>
           </div>
         </dl>
@@ -531,7 +531,7 @@ export function BillingClient({
           </div>
         )}
         {paymentMode !== "full" && <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-          <span>{t("remainingDue")}</span><span className="tabular-nums">{formatBDT(dueCents / 100)}</span>
+          <span>{t("remainingDue")}</span><span className="tabular-nums">{formatBDT(dueCents / 100, locale)}</span>
         </div>}
 
         {paymentMode !== "due" && totalCents > 0 && <>
@@ -607,26 +607,26 @@ export function BillingClient({
               <dl className="mt-4 space-y-1 pb-4 text-sm">
                 <div className="flex justify-between">
                   <dt>{t("subtotal")}</dt>
-                  <dd className="tabular-nums">{formatBDT(subtotal)}</dd>
+                  <dd className="tabular-nums">{formatBDT(subtotal, locale)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt>{t("discount")}</dt>
-                  <dd className="tabular-nums">−{formatBDT(discountNum)}</dd>
+                  <dd className="tabular-nums">−{formatBDT(discountNum, locale)}</dd>
                 </div>
                 {redeemPoints > 0 && <div className="flex justify-between gap-2">
-                  <dt>{t("loyaltyDiscount")}</dt><dd className="tabular-nums">−{formatBDT(redeemPoints)}</dd>
+                  <dt>{t("loyaltyDiscount")}</dt><dd className="tabular-nums">−{formatBDT(redeemPoints, locale)}</dd>
                 </div>}
                 <div className="flex justify-between text-base font-bold">
                   <dt>{t("total")}</dt>
                   <dd className="tabular-nums text-[var(--color-primary)]">
-                    {formatBDT(total)}
+                    {formatBDT(total, locale)}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt>{t("amountReceived")}</dt><dd>{formatBDT(paidCents / 100)}</dd>
+                  <dt>{t("amountReceived")}</dt><dd>{formatBDT(paidCents / 100, locale)}</dd>
                 </div>
                 {dueCents > 0 && <div className="flex justify-between gap-2">
-                  <dt>{t("remainingDue")}</dt><dd>{formatBDT(dueCents / 100)}</dd>
+                  <dt>{t("remainingDue")}</dt><dd>{formatBDT(dueCents / 100, locale)}</dd>
                 </div>}
                 {paidCents > 0 && <div className="flex justify-between gap-2">
                   <dt>{t("payWith")}</dt>
@@ -676,12 +676,12 @@ export function BillingClient({
               <div className="flex justify-between">
                 <dt>{t("successTotal")}</dt>
                 <dd className="font-bold tabular-nums">
-                  {formatBDT(receipt.total)}
+                  {formatBDT(receipt.total, locale)}
                 </dd>
               </div>
-              {Number(receipt.loyalty_discount) > 0 && <div className="flex justify-between gap-2"><dt>{t("loyaltyDiscount")}</dt><dd>−{formatBDT(receipt.loyalty_discount)}</dd></div>}
-              <div className="flex justify-between gap-2"><dt>{t("amountReceived")}</dt><dd>{formatBDT(receipt.paid_total)}</dd></div>
-              <div className="flex justify-between gap-2"><dt>{t("remainingDue")}</dt><dd>{formatBDT(receipt.due_total)}</dd></div>
+              {Number(receipt.loyalty_discount) > 0 && <div className="flex justify-between gap-2"><dt>{t("loyaltyDiscount")}</dt><dd>−{formatBDT(receipt.loyalty_discount, locale)}</dd></div>}
+              <div className="flex justify-between gap-2"><dt>{t("amountReceived")}</dt><dd>{formatBDT(receipt.paid_total, locale)}</dd></div>
+              <div className="flex justify-between gap-2"><dt>{t("remainingDue")}</dt><dd>{formatBDT(receipt.due_total, locale)}</dd></div>
               {receipt.loyalty_points_balance !== null && <>
                 <div className="flex justify-between gap-2"><dt>{t("successPoints")}</dt><dd>+{receipt.loyalty_points_earned}</dd></div>
                 <div className="flex justify-between gap-2"><dt>{t("successRedeemed")}</dt><dd>{receipt.loyalty_points_redeemed}</dd></div>

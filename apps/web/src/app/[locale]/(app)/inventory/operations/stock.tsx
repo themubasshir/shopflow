@@ -46,11 +46,11 @@ export function Batches({ revision, refresh, canWrite }: Props) {
           <div><dt>{t("receivedDate")}</dt><dd className="font-semibold">{formatDate(live.received_at, locale)}</dd></div>
           <div><dt>{t("manufacture")}</dt><dd className="font-semibold">{live.manufacture_date ?? "—"}</dd></div>
           <div><dt>{t("expiry")}</dt><dd className="font-semibold">{live.expiry_date}</dd></div>
-          <div><dt>{t("receivedQuantity")}</dt><dd className="font-semibold">{formatQuantity(live.quantity_received)}</dd></div>
-          <div><dt>{t("physical")}</dt><dd className="font-semibold">{formatQuantity(live.quantity_on_hand)}</dd></div>
-          <div><dt>{t("heldReturns")}</dt><dd className="font-semibold">{formatQuantity(live.held_quantity)}</dd></div>
-          <div><dt>{t("unitCost")}</dt><dd className="font-semibold">{live.purchase_cost === null ? "—" : formatBDT(live.purchase_cost)}</dd></div>
-          <div><dt>{t("sellingReference")}</dt><dd className="font-semibold">{live.price_reference === null ? "—" : formatBDT(live.price_reference)}</dd></div>
+          <div><dt>{t("receivedQuantity")}</dt><dd className="font-semibold">{formatQuantity(live.quantity_received, locale)}</dd></div>
+          <div><dt>{t("physical")}</dt><dd className="font-semibold">{formatQuantity(live.quantity_on_hand, locale)}</dd></div>
+          <div><dt>{t("heldReturns")}</dt><dd className="font-semibold">{formatQuantity(live.held_quantity, locale)}</dd></div>
+          <div><dt>{t("unitCost")}</dt><dd className="font-semibold">{live.purchase_cost === null ? "—" : formatBDT(live.purchase_cost, locale)}</dd></div>
+          <div><dt>{t("sellingReference")}</dt><dd className="font-semibold">{live.price_reference === null ? "—" : formatBDT(live.price_reference, locale)}</dd></div>
         </dl>
         {canWrite && <BatchCommands batch={live} revision={revision} refresh={refresh} />}
       </Card>}
@@ -62,7 +62,7 @@ export function Batches({ revision, refresh, canWrite }: Props) {
             <Badge variant={batch.status === "available" ? "success" : batch.status === "depleted" ? "outline" : "warning"}>{t("batchStatus." + batch.status)}</Badge>
           </div>
           <p className="text-sm">{localizedName(batch.product_name, batch.product_name_bn, locale)}</p>
-          <p className="text-sm">{t("expiry")} {batch.expiry_date} · {t("physical")} <strong>{formatQuantity(batch.quantity_on_hand)}</strong></p>
+          <p className="text-sm">{t("expiry")} {batch.expiry_date} · {t("physical")} <strong>{formatQuantity(batch.quantity_on_hand, locale)}</strong></p>
           <button type="button" className={secondaryButton} onClick={() => setSelected(batch)}>{t("viewBatch")}</button>
         </Card>)}
       </div>
@@ -119,8 +119,8 @@ export function Movements({ initial, revision, refresh, canWrite, product, setPr
         <FetchStatus loading={totals.loading} error={totals.error} />
         {totals.data && <dl className="grid grid-cols-2 gap-2 rounded-lg bg-[var(--color-primary-050)] p-3 text-sm sm:grid-cols-3">
           {([["physical", totals.data.quantity_on_hand], ["heldReturns", totals.data.held_quantity], ["saleable", totals.data.available], ["ledgerStock", totals.data.ledger_quantity],
-            ["valuation", formatBDT(totals.data.value)], ["unvalued", totals.data.unvalued_quantity], ["threshold", totals.data.low_stock_threshold]] as const).map(([label, value]) =>
-            <div key={label}><dt>{t(label)}</dt><dd className="font-semibold">{label === "valuation" ? value : formatQuantity(value)}</dd></div>
+            ["valuation", formatBDT(totals.data.value, locale)], ["unvalued", totals.data.unvalued_quantity], ["threshold", totals.data.low_stock_threshold]] as const).map(([label, value]) =>
+            <div key={label}><dt>{t(label)}</dt><dd className="font-semibold">{label === "valuation" ? value : formatQuantity(value, locale)}</dd></div>
           )}
         </dl>}
         {canWrite && product && <div className="flex flex-wrap gap-2">
@@ -135,7 +135,7 @@ export function Movements({ initial, revision, refresh, canWrite, product, setPr
         {rows.data?.items.map((move) => <Card key={move.id} className="space-y-1 text-sm">
           <div className="flex flex-wrap justify-between gap-2">
             <strong className="min-w-0 break-all">{productName(move.product_id)}</strong>
-            <Badge variant={Number(move.quantity) > 0 ? "success" : "outline"}>{Number(move.quantity) > 0 ? "+" : ""}{formatQuantity(move.quantity)}</Badge>
+            <Badge variant={Number(move.quantity) > 0 ? "success" : "outline"}>{Number(move.quantity) > 0 ? "+" : ""}{formatQuantity(move.quantity, locale)}</Badge>
           </div>
           <p>{t("move." + move.movement_type)} · {formatDate(move.created_at, locale)}</p>
           {move.note && <p className="break-words text-[var(--color-muted-foreground)]">{move.note}</p>}
@@ -199,7 +199,7 @@ export function LowStock({ revision, select }: { revision: number; select: (p: P
       <div className="grid gap-3 lg:grid-cols-2">
         {products.data?.items.map((row) => <Card key={row.id} className="space-y-2">
           <strong>{localizedName(row.name_en, row.name_bn, locale)}</strong>
-          <p className="text-sm">{row.sku} · {t("saleable")} {formatQuantity(row.stock_on_hand)} · {t("threshold")} {formatQuantity(row.low_stock_threshold)}</p>
+          <p className="text-sm">{row.sku} · {t("saleable")} {formatQuantity(row.stock_on_hand, locale)} · {t("threshold")} {formatQuantity(row.low_stock_threshold, locale)}</p>
           <button className={secondaryButton} type="button" onClick={() => select(row)}>{t("movements")}</button>
         </Card>)}
       </div>

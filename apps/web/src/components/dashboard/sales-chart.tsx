@@ -41,7 +41,7 @@ export function SalesChart({ data, locale }: { data: SalesPoint[]; locale: strin
             width={72}
           />
           <Tooltip
-            formatter={(value) => [formatBDT(typeof value === "number" ? value : 0), "Sales"]}
+            formatter={(value) => [formatBDT(typeof value === "number" ? value : 0, locale), "Sales"]}
             contentStyle={{
               borderRadius: "8px",
               border: "1px solid var(--color-border)",

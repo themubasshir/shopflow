@@ -11,7 +11,7 @@ const API_BASE =
  * untouched. The token never reaches client JS.
  */
 const route = new RegExp(
-  "^(?:catalog/(?:products(?:/[0-9a-f-]{36}(?:/state)?)?|categories(?:/[0-9a-f-]{36}|/manage)?|imports/(?:preview|commit)))$",
+  "^(?:catalog/(?:products(?:/[0-9a-f-]{36}(?:/state)?)?|categories(?:/[0-9a-f-]{36}(?:/state)?|/manage)?|imports/(?:preview|commit)))$",
   "i",
 );
 

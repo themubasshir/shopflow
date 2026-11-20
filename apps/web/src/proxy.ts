@@ -8,9 +8,14 @@ const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
 export default function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/api/")) {
     if (safeMethods.has(request.method)) return NextResponse.next();
-    const expectedOrigin = process.env.SHOPFLOW_WEB_ORIGIN ||
-      (process.env.NODE_ENV !== "production" ? request.nextUrl.origin : undefined);
-    if (!expectedOrigin || request.headers.get("origin") !== expectedOrigin) {
+    // Comma-separated allowlist (e.g. "http://localhost:3000,http://127.0.0.1:3000").
+    const allowed = (process.env.SHOPFLOW_WEB_ORIGIN || "")
+      .split(",")
+      .map((o) => o.trim())
+      .filter(Boolean);
+    if (process.env.NODE_ENV !== "production") allowed.push(request.nextUrl.origin);
+    const origin = request.headers.get("origin");
+    if (!origin || !allowed.includes(origin)) {
       return NextResponse.json(
         { error: "Request origin is not allowed", code: "forbidden", details: {} },
         { status: 403 },

@@ -237,11 +237,13 @@
       "sortOrder": "Sort order",
       "products": "Products",
       "save": "Save category",
+      "saveEdit": "Save changes",
       "empty": "No categories yet",
       "errors": {
         "duplicate": "A category with this slug already exists",
         "cycle": "Cannot set parent — it would create a cycle",
         "field": "This field is required or invalid",
+        "deleteBlocked": "Cannot delete — reassign its products and sub-categories first, or deactivate it.",
         "unknown": "Could not save the category."
       }
     },

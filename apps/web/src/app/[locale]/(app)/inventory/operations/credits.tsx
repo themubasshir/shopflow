@@ -27,7 +27,7 @@ export function PurchaseCreditsPanel({ purchase, canWrite, refreshPurchase }: {
       {open && <>
         <FetchStatus loading={view.loading} error={view.error} />
         {view.data && <>
-          <p className="text-sm">{t("supplierPayable")} <strong>{formatBDT(view.data.payable)}</strong></p>
+          <p className="text-sm">{t("supplierPayable")} <strong>{formatBDT(view.data.payable, locale)}</strong></p>
           {canWrite && <div className="flex flex-wrap gap-2">
             {view.data.lots.length > 0 && <button type="button" className={secondaryButton} aria-pressed={action === "ship"}
               onClick={() => setAction(action === "ship" ? "" : "ship")}>{t("sendToSupplier")}</button>}
@@ -43,7 +43,7 @@ export function PurchaseCreditsPanel({ purchase, canWrite, refreshPurchase }: {
           }}>
             <div className="grid gap-2 sm:grid-cols-2">
               {view.data.lots.map((lot) => <Field key={lot.lot_id} name={lot.lot_id} kind="decimal" label={t("lotQty", {
-                name: [localizedName(lot.product, lot.name_bn, locale), lot.batch_number, lot.lot_id.slice(0, 8)].filter(Boolean).join(" · "), qty: formatQuantity(lot.movable),
+                name: [localizedName(lot.product, lot.name_bn, locale), lot.batch_number, lot.lot_id.slice(0, 8)].filter(Boolean).join(" · "), qty: formatQuantity(lot.movable, locale),
               })} />)}
             </div>
             <Field name="reason" label={t("reason")} required />
@@ -55,7 +55,7 @@ export function PurchaseCreditsPanel({ purchase, canWrite, refreshPurchase }: {
           }}>
             <label className="grid gap-1 text-sm font-medium">{t("shipment")}
               <select name="shipment" aria-label={t("shipment")} className={fieldClass} required>
-                {available.map((row) => <option key={row.id} value={row.id}>{row.id.slice(0, 8)} · {formatQuantity(row.quantity)} · {formatBDT(row.cost)}</option>)}
+                {available.map((row) => <option key={row.id} value={row.id}>{row.id.slice(0, 8)} · {formatQuantity(row.quantity, locale)} · {formatBDT(row.cost, locale)}</option>)}
               </select>
             </label>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -77,6 +77,7 @@ function Note({ note, purchase, canWrite, refresh }: {
   note: SupplierCreditNote; purchase: InventoryPurchase; canWrite: boolean; refresh: () => void;
 }) {
   const t = useTranslations("returns");
+  const locale = useLocale();
   const [action, setAction] = useState("");
   const [query, setQuery] = useState("");
   const state = useWrite(refresh);
@@ -92,7 +93,7 @@ function Note({ note, purchase, canWrite, refresh }: {
       <p className="break-words text-sm">{note.reason}</p>
       <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
         {([["amount", note.amount], ["applied", note.applied], ["receivedRefund", note.refunded], ["availableCredit", note.available]] as const)
-          .map(([label, amount]) => <div key={label}><dt>{t(label)}</dt><dd className="font-semibold">{formatBDT(amount)}</dd></div>)}
+          .map(([label, amount]) => <div key={label}><dt>{t(label)}</dt><dd className="font-semibold">{formatBDT(amount, locale)}</dd></div>)}
       </dl>
       {canWrite && Number(note.available) > 0 && <>
         <div className="flex flex-wrap gap-2">
@@ -109,7 +110,7 @@ function Note({ note, purchase, canWrite, refresh }: {
           <label className="grid gap-1 text-sm font-medium">{t("purchase")}
             <select name="purchase" aria-label={t("purchase")} className={fieldClass} required>
               <option value="">{t("selectPurchase")}</option>
-              {posted.map((row) => <option key={row.id} value={row.id}>{row.supplier_invoice_number || row.purchase_number} · {formatBDT(row.outstanding)}</option>)}
+              {posted.map((row) => <option key={row.id} value={row.id}>{row.supplier_invoice_number || row.purchase_number} · {formatBDT(row.outstanding, locale)}</option>)}
             </select>
           </label>
           <Field name="amount" label={t("amount")} kind="decimal" required />
@@ -130,7 +131,7 @@ function Note({ note, purchase, canWrite, refresh }: {
         </Form>}
       </>}
       {(note.entries ?? []).filter((entry) => ["credit_application", "refund"].includes(entry.kind)).map((entry) =>
-        <p key={entry.id} className="break-words text-sm">{t(entry.kind === "refund" ? "receivedRefund" : "applied")} {formatBDT(Math.abs(Number(entry.amount)))}
+        <p key={entry.id} className="break-words text-sm">{t(entry.kind === "refund" ? "receivedRefund" : "applied")} {formatBDT(Math.abs(Number(entry.amount)), locale)}
           {entry.reference ? " · " + entry.reference : ""}</p>
       )}
       <WriteStatus state={state} />

@@ -47,7 +47,7 @@ export function Suppliers({ initial, revision, refresh, canWrite, openPurchase }
               <Badge variant={supplier.is_active ? "success" : "outline"}>{t(supplier.is_active ? "active" : "inactive")}</Badge>
             </div>
             {supplier.phone && <p className="text-sm">{supplier.phone}</p>}
-            <p className="text-sm">{t("outstanding")} <strong className="tabular-nums">{formatBDT(supplier.balance)}</strong></p>
+            <p className="text-sm">{t("outstanding")} <strong className="tabular-nums">{formatBDT(supplier.balance, locale)}</strong></p>
             <button type="button" className={secondaryButton + " justify-self-start"}
               aria-pressed={selected === supplier.id} onClick={() => { setSelected(supplier.id); setLedgerOffset(0); }}>{t("supplierHistory")}</button>
           </Card>
@@ -78,7 +78,7 @@ export function Suppliers({ initial, revision, refresh, canWrite, openPurchase }
               <h3 className="font-semibold">{t("ledger")}</h3>
               <FetchStatus loading={ledger.loading} error={ledger.error} empty={ledger.data?.items.length === 0} />
               {ledger.data?.items.map((entry) => <div key={entry.id} className="grid gap-1 border-b border-[var(--color-border)] pb-2 text-sm">
-                <div className="flex flex-wrap justify-between gap-2"><span>{t("entry." + entry.kind)}</span><strong>{formatBDT(entry.amount)}</strong></div>
+                <div className="flex flex-wrap justify-between gap-2"><span>{t("entry." + entry.kind)}</span><strong>{formatBDT(entry.amount, locale)}</strong></div>
                 <span className="text-[var(--color-muted-foreground)]">
                   {formatDate(entry.created_at, locale)}{entry.method ? " · " + t("method." + entry.method) : ""}
                 </span>

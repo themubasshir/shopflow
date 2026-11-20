@@ -213,10 +213,28 @@ export interface paths {
         /** Update Category */
         put: operations["update_category_api_v1_catalog_categories__category_id__put"];
         post?: never;
-        delete?: never;
+        /** Delete Category */
+        delete: operations["delete_category_api_v1_catalog_categories__category_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/categories/{category_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set Category State */
+        patch: operations["set_category_state_api_v1_catalog_categories__category_id__state_patch"];
         trace?: never;
     };
     "/api/v1/catalog/imports/preview": {
@@ -4740,6 +4758,70 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CategoryWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryManageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_category_api_v1_catalog_categories__category_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_category_state_api_v1_catalog_categories__category_id__state_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductStateWrite"];
             };
         };
         responses: {

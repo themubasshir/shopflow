@@ -45,7 +45,7 @@ export function Purchases({ initial, revision, refresh, canWrite, selected, setS
             <Badge variant={order.status === "received" ? "success" : "outline"}>{t("purchaseStatus." + order.status)}</Badge>
           </div>
           {order.supplier_name && <p className="text-sm">{localizedName(order.supplier_name, order.supplier_name_bn, locale)}</p>}
-          <p className="text-sm">{t("total")} <strong>{formatBDT(order.total)}</strong></p>
+          <p className="text-sm">{t("total")} <strong>{formatBDT(order.total, locale)}</strong></p>
           <button type="button" className={secondaryButton} onClick={() => setSelected(order.id)}>{t("viewPurchase")}</button>
         </Card>)}
       </div>
@@ -173,13 +173,13 @@ function PurchaseDetail({ purchase, initial, canWrite, refresh, close }: {
       </div>
       <dl className="grid grid-cols-2 gap-2 rounded-lg bg-[var(--color-primary-050)] p-3 text-sm sm:grid-cols-4">
         {([["total", purchase.total], ["received", purchase.received_total], ["paid", purchase.paid_total], ["outstanding", purchase.outstanding]] as const).map(([label, amount]) =>
-          <div key={label}><dt>{t(label)}</dt><dd className="font-bold tabular-nums">{formatBDT(amount)}</dd></div>
+          <div key={label}><dt>{t(label)}</dt><dd className="font-bold tabular-nums">{formatBDT(amount, locale)}</dd></div>
         )}
       </dl>
       <ul className="divide-y divide-[var(--color-border)]">
         {purchase.items.map((item) => <li key={item.id} className="space-y-1 py-2 text-sm">
           <p className="break-all font-medium">{itemName(item)}{item.batch_number ? " · " + item.batch_number : ""}</p>
-          <p>{t("quantity")} {formatQuantity(item.quantity)} {localizedName(item.unit_name, item.unit_name_bn, locale)} · {t("unitCost")} {formatBDT(item.unit_cost)} · {t("remaining")} {formatQuantity(remaining(item))}</p>
+          <p>{t("quantity")} {formatQuantity(item.quantity, locale)} {localizedName(item.unit_name, item.unit_name_bn, locale)} · {t("unitCost")} {formatBDT(item.unit_cost, locale)} · {t("remaining")} {formatQuantity(remaining(item), locale)}</p>
         </li>)}
       </ul>
       {canWrite && <div className="flex flex-wrap gap-2">

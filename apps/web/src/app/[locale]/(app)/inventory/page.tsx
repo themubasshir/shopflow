@@ -86,9 +86,9 @@ export default async function InventoryPage({ params }: { params: Promise<{ loca
                         </Badge>
                       </td>
                       <td className="px-4 py-3 tabular-nums">
-                        {formatQuantity(p.stock_on_hand)} {p.unit}
+                        {formatQuantity(p.stock_on_hand, locale)} {p.unit}
                       </td>
-                      <td className="px-4 py-3 font-semibold tabular-nums">{formatBDT(p.price)}</td>
+                      <td className="px-4 py-3 font-semibold tabular-nums">{formatBDT(p.price, locale)}</td>
                       <td className="px-4 py-3">
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </td>
