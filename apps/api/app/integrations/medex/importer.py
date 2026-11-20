@@ -73,12 +73,19 @@ def run_import(
     fetch_bn: bool = False,
     detail_fetcher=None,
     stop_check: Callable[[], bool] = lambda: False,
+    auto_promote: bool = False,
+    principal=None,
 ) -> MedicineCatalogImportRun:
     """Execute one import run end-to-end, committing checkpoints along the way.
 
     ``detail_fetcher`` optionally supplies a second callable for Bangla pages
     (defaults to the same fetcher). ``stop_check`` is polled each iteration;
     returning True marks the run ``interrupted`` and returns — resumable later.
+
+    ``auto_promote`` + ``principal`` (Phase 3C): when set, each staged medicine
+    is immediately promoted to a zero-stock, unpriced product via the bulk
+    promoter — no manual approval needed. Already-imported/ambiguous/invalid
+    rows are skipped or held in review by the same classification rules.
     """
     source = get_or_create_source(db)
     ck.mark_running(db, run)
@@ -161,6 +168,18 @@ def run_import(
             ck.record_detail_done(db, run, url, staged=True)
             db.commit()
             logger.info("medex staged %s (%s)", detail.brand_name or detail.brand_name_bn, action)
+            if auto_promote and principal is not None:
+                # Phase 3C: promote this just-staged medicine immediately if it
+                # classifies 'ready'. Bounded to a tiny sweep so it stays cheap
+                # and commits inside the same per-detail checkpoint cadence.
+                try:
+                    from app.integrations.medex.promoter import promote_batch
+
+                    promote_batch(db, principal, limit=1)
+                    db.commit()
+                except Exception:  # never let a promote error kill the collector
+                    db.rollback()
+                    logger.exception("medex auto-promote failed for %s", url)
         except FetchError as exc:
             ck.record_detail_error(db, run, url, exc.detail)
             db.commit()
