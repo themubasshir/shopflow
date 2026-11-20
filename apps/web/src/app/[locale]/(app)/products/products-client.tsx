@@ -77,6 +77,9 @@ export function ProductsClient({
   const [query, setQuery] = useState(initialQuery);
   const [view, setView] = useState(initialView);
   const [editing, setEditing] = useState<ProductDetailOut | "new" | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [busyDelete, setBusyDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   function search(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -233,11 +236,52 @@ export function ProductsClient({
                           <Pencil size={15} aria-hidden="true" />
                         </button>
                       )}
+                      {canWrite && (
+                        <button
+                          className={`${secondaryButton} text-red-700`}
+                          disabled={busyDelete === p.id}
+                          onClick={() => setConfirmingDelete(p.id)}
+                          aria-label={t("delete")}
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
               </ul>
             </div>
+          )}
+
+          {confirmingDelete && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+              <span className="text-sm text-red-800">{t("deleteConfirm")}</span>
+              <button
+                type="button"
+                className="inline-flex min-h-9 items-center gap-2 rounded-md bg-red-700 px-3 text-sm font-semibold text-white disabled:opacity-50"
+                disabled={busyDelete !== null}
+                onClick={() => deleteProduct(confirmingDelete)}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+                {t(busyDelete ? "deleting" : "deleteYes")}
+              </button>
+              <button
+                type="button"
+                className={secondaryButton}
+                disabled={busyDelete !== null}
+                onClick={() => {
+                  setConfirmingDelete(null);
+                  setDeleteError("");
+                }}
+              >
+                {t("cancel")}
+              </button>
+            </div>
+          )}
+          {deleteError && (
+            <p role="alert" className="text-sm text-red-700">
+              {t(`errors.${deleteError}` as never)}
+            </p>
           )}
 
           <Pagination
@@ -276,6 +320,32 @@ export function ProductsClient({
       `/api/catalog-ops/catalog/products/${id}`,
     );
     setEditing(detail);
+  }
+
+  async function deleteProduct(id: string) {
+    setDeleteError("");
+    setBusyDelete(id);
+    try {
+      await browserRequest(`/api/catalog-ops/catalog/products/${id}`, {
+        method: "DELETE",
+      });
+      setConfirmingDelete(null);
+      // A hard delete can remove the last row on this page — step back a page
+      // when that happens so the user doesn't land on an empty view.
+      if (products.length === 1 && page > 1) {
+        gotoPage(page - 1);
+      } else {
+        router.refresh();
+      }
+    } catch (err) {
+      // API refuses hard delete when the product has sales/inventory history.
+      setDeleteError(
+        errorCode(err) === "validation_error" ? "deleteBlocked" : "unknown",
+      );
+      setConfirmingDelete(null);
+    } finally {
+      setBusyDelete(null);
+    }
   }
 }
 
@@ -413,6 +483,8 @@ function ProductForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [invalid, setInvalid] = useState<string[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [isMedicine, setIsMedicine] = useState(detail?.is_medicine ?? false);
   const [units, setUnits] = useState<ProductUnitWrite[]>(
     detail?.units?.length
@@ -507,7 +579,7 @@ function ProductForm({
       onSaved();
     } catch (err) {
       const code = errorCode(err);
-      setError(code === "conflict" ? "duplicate" : code === "validation" ? "units" : "unknown");
+      setError(code === "conflict" ? "duplicate" : code === "validation_error" ? "units" : "unknown");
       setInvalid(Object.keys(fieldErrors(err)));
     } finally {
       setSaving(false);
@@ -515,6 +587,25 @@ function ProductForm({
   }
 
   const med = detail?.medicine;
+
+  async function remove() {
+    if (!detail) return;
+    setError("");
+    setDeleting(true);
+    try {
+      await browserRequest(`/api/catalog-ops/catalog/products/${detail.id}`, {
+        method: "DELETE",
+      });
+      onSaved();
+    } catch (err) {
+      // The API refuses to hard-delete a product with sales/inventory
+      // history — it must be deactivated instead.
+      setError(errorCode(err) === "validation_error" ? "deleteBlocked" : "unknown");
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true">
@@ -632,6 +723,39 @@ function ProductForm({
           <div className="flex flex-wrap gap-2">
             <button className={primaryButton} disabled={saving}>{t(saving ? "saving" : "save")}</button>
             <button type="button" className={secondaryButton} disabled={saving} onClick={onClose}>{t("cancel")}</button>
+            {detail && !confirmDelete && (
+              <button
+                type="button"
+                className={`${secondaryButton} ml-auto text-red-700`}
+                disabled={saving || deleting}
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 size={16} aria-hidden="true" />
+                {t("delete")}
+              </button>
+            )}
+            {detail && confirmDelete && (
+              <span className="ml-auto flex flex-wrap items-center gap-2">
+                <span className="text-sm text-red-700">{t("deleteConfirm")}</span>
+                <button
+                  type="button"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-md bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  disabled={deleting}
+                  onClick={remove}
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                  {t(deleting ? "deleting" : "deleteYes")}
+                </button>
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  disabled={deleting}
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  {t("cancel")}
+                </button>
+              </span>
+            )}
           </div>
         </form>
       </Card>
@@ -684,7 +808,7 @@ function CategoriesTab({ categories }: { categories: CategoryManageOut[] }) {
       router.refresh();
     } catch (err) {
       const code = errorCode(err);
-      setError(code === "conflict" ? "duplicate" : code === "validation" ? "cycle" : "unknown");
+      setError(code === "conflict" ? "duplicate" : code === "validation_error" ? "cycle" : "unknown");
     } finally {
       setSaving(false);
     }

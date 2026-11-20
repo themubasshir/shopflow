@@ -99,7 +99,13 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     units: Mapped[list[ProductUnit]] = relationship(
         back_populates="product", cascade="all, delete-orphan"
     )
-    medicine: Mapped[MedicineDetail | None] = relationship(back_populates="product", uselist=False)
+    # `units` and `medicine` are catalog-owned and removed with the product.
+    # `batches` is deliberately NOT delete-orphan: a batch is stock history and
+    # must block hard-delete (see services.catalog._has_history), never be
+    # silently swept away.
+    medicine: Mapped[MedicineDetail | None] = relationship(
+        back_populates="product", uselist=False, cascade="all, delete-orphan"
+    )
     batches: Mapped[list[MedicineBatch]] = relationship(back_populates="product")
 
     __table_args__ = (

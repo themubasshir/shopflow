@@ -8,6 +8,7 @@ conversions, zero-stock creation, authorization, and CSV/XLSX import.
 from __future__ import annotations
 
 import io
+from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
@@ -19,7 +20,7 @@ from app.api.deps import Principal
 from app.core.errors import ConflictError, ValidationError
 from app.db.session import SessionLocal
 from app.main import app
-from app.models import Category, Counter, InvoiceItem, Product, Shop, User
+from app.models import Category, Counter, InvoiceItem, MedicineBatch, MedicineDetail, Product, Shop, User
 from app.schemas.catalog import (
     CategoryWrite,
     MedicineWrite,
@@ -241,6 +242,44 @@ def test_deactivation_preserves_row(setup):
         assert db.get(Product, detail.id) is not None
         reactivated = catalog_service.set_product_active(db, actor, detail.id, True)
         assert reactivated.is_active is True
+        db.rollback()
+
+
+def test_hard_delete_medicine_cascades_details(setup):
+    """A medicine with no history hard-deletes, taking medicine_details with it.
+
+    Regression: `Product.medicine` had no delete-orphan cascade, so SQLAlchemy
+    NULLed `medicine_details.product_id` and the NOT NULL constraint crashed the
+    delete instead of removing the row.
+    """
+    actor, categories, _, _ = setup
+    with SessionLocal() as db:
+        detail = catalog_service.create_product(db, actor, _medicine_body(categories))
+        catalog_service.delete_product(db, actor, detail.id)
+        assert db.get(Product, detail.id) is None
+        assert db.scalar(
+            select(MedicineDetail).where(MedicineDetail.product_id == detail.id)
+        ) is None
+        db.rollback()
+
+
+def test_hard_delete_blocked_by_medicine_batch(setup):
+    """A batch is stock history — it must block the delete, not be swept away."""
+    actor, categories, _, _ = setup
+    with SessionLocal() as db:
+        detail = catalog_service.create_product(db, actor, _medicine_body(categories))
+        db.add(
+            MedicineBatch(
+                shop_id=actor.shop_id,
+                product_id=detail.id,
+                batch_number="B-" + uuid4().hex[:6],
+                expiry_date=date(2030, 1, 1),
+                quantity_received=Decimal("10"),
+            )
+        )
+        db.commit()
+        with pytest.raises(ValidationError):
+            catalog_service.delete_product(db, actor, detail.id)
         db.rollback()
 
 

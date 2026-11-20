@@ -222,11 +222,15 @@
     "next": "Next",
     "results": "Showing {first}–{last} of {total}",
     "perPage": "Per page",
+    "deleteConfirm": "Delete this product permanently?",
+    "deleteYes": "Yes, delete",
+    "deleting": "Deleting…",
     "errors": {
       "field": "This field is required or invalid",
       "duplicate": "SKU or barcode already exists",
       "unknown": "Could not save the product. Please try again.",
-      "units": "Check units — need exactly one base unit with conversion 1"
+      "units": "Check units — need exactly one base unit with conversion 1",
+      "deleteBlocked": "This product has sales or inventory history — deactivate it instead of deleting."
     },
     "categories": {
       "title": "Categories",

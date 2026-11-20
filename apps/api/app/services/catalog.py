@@ -27,11 +27,14 @@ from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.models import (
     Category,
     InvoiceItem,
+    MedicineBatch,
     MedicineDetail,
     Product,
     ProductUnit,
     PurchaseItem,
+    StockLot,
     StockMovement,
+    SupplierProduct,
 )
 from app.schemas.catalog import (
     CategoryManageOut,
@@ -314,7 +317,12 @@ def product_by_id(db: Session, principal: Principal, product_id: UUID) -> Produc
 
 
 def _has_history(db: Session, product_id: UUID) -> bool:
-    """Financial or inventory history => never hard-delete."""
+    """Financial or inventory history => never hard-delete.
+
+    Covers every table whose ``products.id`` FK is ``RESTRICT`` — leaving one
+    out would let the ORM delete reach the DB and crash on the FK instead of
+    returning a friendly 'deactivate instead' error.
+    """
     checks = (
         db.scalar(
             select(func.count())
@@ -330,6 +338,21 @@ def _has_history(db: Session, product_id: UUID) -> bool:
             select(func.count())
             .select_from(PurchaseItem)
             .where(PurchaseItem.product_id == product_id)
+        ),
+        db.scalar(
+            select(func.count())
+            .select_from(MedicineBatch)
+            .where(MedicineBatch.product_id == product_id)
+        ),
+        db.scalar(
+            select(func.count())
+            .select_from(StockLot)
+            .where(StockLot.product_id == product_id)
+        ),
+        db.scalar(
+            select(func.count())
+            .select_from(SupplierProduct)
+            .where(SupplierProduct.product_id == product_id)
         ),
     )
     return any(c and c > 0 for c in checks)
