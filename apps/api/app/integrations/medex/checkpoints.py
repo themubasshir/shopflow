@@ -105,6 +105,19 @@ def pop_next_url(run: MedicineCatalogImportRun) -> str | None:
     return pending[0] if pending else None
 
 
+def push_back_url(db: Session, run: MedicineCatalogImportRun, url: str) -> None:
+    """Return a URL to the pending queue without consuming an attempt.
+
+    Used when the security gate is hit: the manifest row stays ``pending`` so a
+    later resume re-fetches it once the challenge clears, and the run counter
+    isn't incremented (it wasn't a real fetch)."""
+    pending = list(run.pending_urls or [])
+    if url not in pending:
+        pending.insert(0, url)  # front — it was the next item, keep order
+    run.pending_urls = pending
+    db.flush()
+
+
 def _manifest_for_url(db: Session, run: MedicineCatalogImportRun, url: str):
     """Find the manifest row matching a pending URL (by source + external_id)."""
     from app.integrations.medex.index_parser import detail_id_from_url

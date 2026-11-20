@@ -65,6 +65,25 @@ def _merge_bn(detail: MedicineDetail, bn: MedicineDetail | None) -> None:
     # Bangla page is authoritative for *_bn only; never let it clobber EN fields.
 
 
+def _looks_like_gate(html: str, url: str) -> bool:
+    """True when MedEx served its security-check instead of a medicine page.
+
+    The site's anti-bot layer answers detail URLs with HTTP 200 + a
+    ``/captcha-challenge`` page. Per the spec we never *bypass* a challenge —
+    we detect it and stop, rather than stage thousands of invalid rows. The
+    markers are deliberately specific so a real medicine page (which mentions
+    none of them in the <title>) never trips the detector.
+    """
+    if "/captcha-challenge" in url:
+        return True
+    head = html[:4000].lower()
+    return (
+        "security check" in head
+        or "captcha-challenge" in head
+        or ("captcha" in head and "challenge" in head and "brand" not in head)
+    )
+
+
 def run_import(
     db: Session,
     fetcher: IndexFetcher,
@@ -156,6 +175,15 @@ def run_import(
             return run
         try:
             html, content = detail_fetcher.fetch_detail(url)
+            if _looks_like_gate(html, url):
+                # Security gate: stop cleanly, leave the URL pending so it can
+                # be re-fetched after the challenge clears. Do NOT stage the
+                # challenge page as a medicine and never try to bypass it.
+                logger.warning("medex security gate at %s — stopping run", url)
+                ck.push_back_url(db, run, url)
+                ck.finish(db, run, "gated")
+                db.commit()
+                return run
             detail = parse_detail(html, url, content=content)
             if fetch_bn:
                 try:

@@ -426,3 +426,65 @@ def test_manual_products_never_overwritten(actor):
         db.commit()
         p = db.get(Product, manual_id)
         assert p.sku == manual_sku and p.name_en == "Rice 5kg"
+
+
+# ---------------------------------------------------------------------------
+# Security-gate detection (MedEx captcha-challenge)
+# ---------------------------------------------------------------------------
+
+CAPTCHA_HTML = """<!DOCTYPE html><html><head><title>Security Check | MedEx</title>
+<meta name="l-csrf-token" content="x"></head><body><form id="captcha-challenge">
+<p>Verify you are human</p></form></body></html>"""
+
+
+def test_looks_like_gate_flags_captcha():
+    from app.integrations.medex.importer import _looks_like_gate
+
+    assert _looks_like_gate(CAPTCHA_HTML, "https://medex.com.bd/brands/5/x")
+    assert _looks_like_gate("<html></html>", "https://medex.com.bd/captcha-challenge")
+    # a real medicine page (mentions brand/dosage, no security title) is NOT gated
+    real = _fixture("detail_tablet.html")
+    assert not _looks_like_gate(real, "https://medex.com.bd/brands/13582/x")
+
+
+def test_gate_stops_run_instead_of_staging(actor):
+    """A captcha response must stop the run + leave the URL pending — never
+    stage the challenge page as an invalid medicine."""
+    from app.integrations.medex.importer import run_import
+    from app.integrations.medex.repository import create_run
+
+    class GateAfterFirst:
+        """First detail is real; every subsequent returns the captcha page."""
+
+        def __init__(self):
+            self.detail_calls = []
+
+        def fetch_index(self, page):
+            # minimal valid index: two brand-card anchors
+            html = """
+            <a class="brand-card" href="/brands/13582/ace-500-mg-tablet">
+              <span class="brand-card__name">Ace</span>
+              <span class="brand-card__generic">Paracetamol</span>
+            </a>
+            <a class="brand-card" href="/brands/6171/seclo-20-mg-capsule">
+              <span class="brand-card__name">Seclo</span>
+              <span class="brand-card__generic">Omeprazole</span>
+            </a>"""
+            return html, "https://medex.com.bd/brands"
+
+        def fetch_detail(self, url):
+            self.detail_calls.append(url)
+            if len(self.detail_calls) == 1:
+                html = _fixture("detail_tablet.html")
+                return html, html.encode()
+            return CAPTCHA_HTML, CAPTCHA_HTML.encode()
+
+    with SessionLocal() as db:
+        src = get_or_create_source(db)
+        run = create_run(db, src, scope="full", index_start=1, index_limit=1, detail_limit=None)
+        db.commit()
+        out = run_import(db, GateAfterFirst(), run, fetch_bn=False)
+        db.commit()
+        assert out.status == "gated"
+        # the captcha URL was pushed back to pending, not staged as a medicine
+        assert db.scalar(select(func.count(MedicineCatalogStaging.id))) == 1
