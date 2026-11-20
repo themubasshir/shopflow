@@ -131,4 +131,36 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+
+  // ---- Phase 3A: MedEx medicine-catalog import ------------------------------
+  medexSource: () => request<import("@/types").MedexSourceOut>("/catalog/medex/source"),
+  medexRuns: (limit = 20) =>
+    request<import("@/types").MedexRunOut[]>(`/catalog/medex/runs?limit=${limit}`),
+  medexStaging: (params?: Record<string, string | number>) => {
+    const qs = params
+      ? "?" +
+        new URLSearchParams(
+          Object.entries(params).map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : "";
+    return request<import("@/types").MedexStagingListOut>(
+      `/catalog/medex/staging${qs}`,
+    );
+  },
+  medexFilters: () =>
+    request<{ manufacturers: string[]; generics: string[] }>(
+      "/catalog/medex/staging/filters",
+    ),
+  medexStats: () => request<import("@/types").MedexStatsOut>("/catalog/medex/staging/stats"),
+  medexMatches: (params?: { staging_id?: string; status?: string }) => {
+    const qs = params
+      ? "?" +
+        new URLSearchParams(
+          Object.entries(params)
+            .filter(([, v]) => v != null)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString()
+      : "";
+    return request<import("@/types").MedexMatchOut[]>(`/catalog/medex/matches${qs}`);
+  },
 };

@@ -367,3 +367,95 @@ export type InventoryBatch = components["schemas"]["BatchOut"];
 export type InventoryUnit = components["schemas"]["ProductUnitOut"];
 export type InventoryMovement = components["schemas"]["MovementOut"];
 export type InventoryValue = components["schemas"]["StockValue"];
+
+// ---- Phase 3A: MedEx medicine-catalog import (hand-mirrors app/schemas/medex) --
+export interface MedexSourceOut {
+  id: string;
+  code: string;
+  name: string;
+  base_url: string;
+  is_active: boolean;
+  consent_note: string | null;
+  consent_recorded_at: string | null;
+}
+
+export interface MedexRunOut {
+  id: string;
+  scope: string;
+  status: string;
+  index_start: number;
+  index_limit: number | null;
+  detail_limit: number | null;
+  last_index_page: number;
+  last_page_seen: number | null;
+  discovered: number;
+  fetched: number;
+  staged: number;
+  failed: number;
+  pending_count: number;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface MedexStagingOut {
+  id: string;
+  external_id: string;
+  source_url: string;
+  slug: string | null;
+  brand_name: string | null;
+  brand_name_bn: string | null;
+  generic_name: string | null;
+  generic_name_bn: string | null;
+  manufacturer: string | null;
+  manufacturer_bn: string | null;
+  strength: string | null;
+  strength_bn: string | null;
+  dosage_form: string | null;
+  dosage_form_bn: string | null;
+  unit_price: string | null;
+  strip_price: string | null;
+  pack_price: string | null;
+  pack_quantity: number | null;
+  units_per_pack: number | null;
+  pack_label: string | null;
+  therapeutic_class: string | null;
+  prescription_note: string | null;
+  validation_status: string;
+  import_status: string;
+  parse_warnings: string[];
+  source_fetched_at: string | null;
+  reviewed_at: string | null;
+  linked_product_id: string | null;
+  content_hash: string | null;
+}
+
+export interface MedexStagingListOut {
+  rows: MedexStagingOut[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface MedexMatchOut {
+  id: string;
+  staging_id: string;
+  product_id: string;
+  basis: string;
+  score: number;
+  status: string;
+  product_name_en: string | null;
+  product_sku: string | null;
+}
+
+export interface MedexStatsOut {
+  total: number;
+  by_status: Record<string, number>;
+  missing_price: number;
+  match_candidates: number;
+}
+
+export interface MedexApproveBody {
+  staging_id: string;
+  selling_price?: string | null;
+  link_product_id?: string | null;
+}

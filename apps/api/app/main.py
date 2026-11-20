@@ -21,6 +21,7 @@ from app.api.v1 import (
     employees,
     health,
     inventory,
+    medex,
     printing,
     purchasing,
     receipts,
@@ -146,6 +147,7 @@ app.include_router(sales.router, prefix=settings.api_v1_prefix)
 app.include_router(receipts.router, prefix=settings.api_v1_prefix)
 app.include_router(purchasing.router, prefix=settings.api_v1_prefix)
 app.include_router(inventory.router, prefix=settings.api_v1_prefix)
+app.include_router(medex.router, prefix=settings.api_v1_prefix)
 app.include_router(returns.router, prefix=settings.api_v1_prefix)
 app.include_router(customers.router, prefix=settings.api_v1_prefix)
 app.include_router(employees.router, prefix=settings.api_v1_prefix)

@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { Store, MonitorSmartphone, Globe, Printer } from "lucide-react";
+import { Store, MonitorSmartphone, Globe, Pill, Printer } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
@@ -19,12 +19,14 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
 
   const tReceipt = await getTranslations({ locale, namespace: "receipts" });
   const tPrinter = await getTranslations({ locale, namespace: "printers" });
+  const tMedex = await getTranslations({ locale, namespace: "medex" });
   const [dashboard, session, printers] = await Promise.all([
     api.dashboard().catch(() => null),
     verifySession(),
     api.printers().catch(() => null),
   ]);
   const canEditReceipt = session?.me.role === "owner" && hasPermission(session.me, "settings:write");
+  const canImportMedicine = !!session && hasPermission(session.me, "catalog:write");
   const receipt = canEditReceipt ? await api.receiptSettings().catch(() => null) : null;
 
   const rows = [
@@ -73,14 +75,20 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
             </li>
           ))}
         </ul>
-        {canEditReceipt ? (
-          <div className="mt-3 border-t border-[var(--color-border)] pt-3">
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-3">
+          {canEditReceipt ? (
             <Link href="/settings/printers" className={secondaryButton}>
               <Printer size={17} aria-hidden="true" />
               {tPrinter("manage")}
             </Link>
-          </div>
-        ) : null}
+          ) : null}
+          {canImportMedicine ? (
+            <Link href="/settings/medex" className={secondaryButton}>
+              <Pill size={17} aria-hidden="true" />
+              {tMedex("title")}
+            </Link>
+          ) : null}
+        </div>
       </Card>
 
       <Card className="bg-[var(--color-primary-050)]">

@@ -24,6 +24,13 @@ from app.models.loyalty import (
     LoyaltyRule,
     LoyaltyTransaction,
 )
+from app.models.medex import (
+    MedicineCatalogImportRun,
+    MedicineCatalogMatch,
+    MedicineCatalogSource,
+    MedicineCatalogStaging,
+    MedicineCatalogSyncHistory,
+)
 from app.models.printing import CounterPrinter, Printer, PrintJob
 from app.models.returns import (
     CustomerRefundSettlement,
@@ -57,6 +64,11 @@ __all__ = [
     "LoyaltyRule",
     "LoyaltyTransaction",
     "MedicineBatch",
+    "MedicineCatalogImportRun",
+    "MedicineCatalogMatch",
+    "MedicineCatalogSource",
+    "MedicineCatalogStaging",
+    "MedicineCatalogSyncHistory",
     "MedicineDetail",
     "Payment",
     "PrintJob",
