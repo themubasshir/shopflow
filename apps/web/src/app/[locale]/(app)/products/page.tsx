@@ -9,16 +9,19 @@ export default async function ProductsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string; tab?: string }>;
+  searchParams: Promise<{ q?: string; tab?: string; view?: string }>;
 }) {
   const { locale } = await params;
-  const { q = "", tab = "products" } = await searchParams;
+  const { q = "", tab = "products", view = "" } = await searchParams;
   const session = await verifySession();
 
   const canWrite = session ? hasPermission(session.me, "catalog:write") : false;
 
+  const prodParams: Record<string, string | number | boolean> = { limit: 200 };
+  if (q) prodParams.q = q;
+  if (view) prodParams.view = view;
   const [products, categories, categoriesManage] = await Promise.all([
-    api.products(q ? { q, limit: 200 } : { limit: 200 }).catch(() => null),
+    api.products(prodParams).catch(() => null),
     api.categories().catch(() => []),
     canWrite ? api.categoriesManage().catch(() => []) : Promise.resolve([]),
   ]);
@@ -29,6 +32,7 @@ export default async function ProductsPage({
       canWrite={canWrite}
       initialTab={tab}
       initialQuery={q}
+      initialView={view}
       products={products?.items ?? []}
       categories={categories}
       categoriesManage={categoriesManage}

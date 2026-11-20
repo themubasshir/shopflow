@@ -35,6 +35,7 @@ export function ProductsClient({
   canWrite,
   initialTab,
   initialQuery,
+  initialView = "",
   products,
   categories,
   categoriesManage,
@@ -43,6 +44,7 @@ export function ProductsClient({
   canWrite: boolean;
   initialTab: string;
   initialQuery: string;
+  initialView?: string;
   products: ProductOut[];
   categories: CategoryOut[];
   categoriesManage: CategoryManageOut[];
@@ -55,13 +57,29 @@ export function ProductsClient({
       : "products",
   );
   const [query, setQuery] = useState(initialQuery);
+  const [view, setView] = useState(initialView);
   const [editing, setEditing] = useState<ProductDetailOut | "new" | null>(null);
 
   function search(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    router.push(`/products?q=${encodeURIComponent(query)}`);
+    applyNav(query, view);
+  }
+
+  function applyNav(q: string, v: string) {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (v) params.set("view", v);
+    router.push(`/products${params.size ? `?${params}` : ""}`);
     router.refresh();
   }
+
+  const views = [
+    { key: "", label: t("views.all") },
+    { key: "in_stock", label: t("views.inStock") },
+    { key: "out_of_stock", label: t("views.outOfStock") },
+    { key: "missing_price", label: t("views.missingPrice") },
+    { key: "medicine", label: t("views.medicines") },
+  ];
 
   const tabs: { key: Tab; label: string; writeOnly?: boolean }[] = [
     { key: "products", label: t("title") },
@@ -120,6 +138,28 @@ export function ProductsClient({
               <Search size={18} aria-hidden="true" />
             </button>
           </form>
+
+          {/* Catalog views: imported MedEx medicines show up under
+              out_of_stock / missing_price until the owner stocks + prices them. */}
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("views.all")}>
+            {views.map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => {
+                  setView(v.key);
+                  applyNav(query, v.key);
+                }}
+                className={`min-h-8 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                  view === v.key
+                    ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
+                    : "border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-ink)] hover:border-[var(--color-primary)]"
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
 
           {products.length === 0 ? (
             <EmptyState title={t("empty")} hint={t("emptyHint")} />

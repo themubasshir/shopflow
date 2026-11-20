@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function BillingPage() {
   const locale = await getLocale();
   const [products, counters, customers, session] = await Promise.all([
-    api.products({ limit: 100 }).catch(() => null),
+    api.products({ limit: 100, sellable: true }).catch(() => null),
     api.counters().catch(() => null),
     api.customers(new URLSearchParams({ active: "true", limit: "30" })).catch(() => null),
     verifySession(),

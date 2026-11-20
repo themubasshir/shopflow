@@ -111,3 +111,36 @@ class RejectBody(BaseModel):
 class MatchBody(BaseModel):
     match_id: UUID
     confirm: bool
+
+
+# --- Phase 3C: bulk promotion -------------------------------------------------
+
+
+class BulkImportBody(BaseModel):
+    """One bulk-promotion sweep. ``limit`` bounds the batch so a very large
+
+    catalog is imported in manageable, resumable transactions."""
+
+    limit: int = 500
+
+
+class BulkImportOut(BaseModel):
+    ready: int = 0
+    imported: int = 0
+    skipped_existing: int = 0
+    duplicates: int = 0
+    invalid: int = 0
+    ambiguous: int = 0
+    non_medicine: int = 0
+    failed: int = 0
+    errors: list[dict] = []
+
+
+class PromotionProgressOut(BaseModel):
+    total: int = 0
+    ready: int = 0
+    imported: int = 0
+    duplicates: int = 0
+    invalid: int = 0
+    ambiguous: int = 0
+    non_medicine: int = 0

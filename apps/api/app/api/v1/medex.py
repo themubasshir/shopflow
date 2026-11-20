@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import Principal, get_authenticated_principal
 from app.db.session import get_db
-from app.integrations.medex import approver, repository
+from app.integrations.medex import approver, promoter, repository
 from app.models import (
     MedicineCatalogImportRun,
     MedicineCatalogMatch,
@@ -26,8 +26,11 @@ from app.models import (
 )
 from app.schemas.medex import (
     ApproveBody,
+    BulkImportBody,
+    BulkImportOut,
     MatchBody,
     MatchOut,
+    PromotionProgressOut,
     RejectBody,
     RunOut,
     SourceOut,
@@ -210,3 +213,24 @@ def decide_match(body: MatchBody, db: Session = Db, principal: Principal = Auth)
         product_name_en=p.name_en if p else None,
         product_sku=p.sku if p else None,
     )
+
+
+# --- Phase 3C: bulk promotion -------------------------------------------------
+
+
+@router.get("/promotion/progress", response_model=PromotionProgressOut)
+def promotion_progress(db: Session = Db, principal: Principal = Auth) -> PromotionProgressOut:
+    """How many staged rows fall into each bulk-import classification."""
+    principal.require("catalog:read")
+    src = _source(db)
+    return PromotionProgressOut(**promoter.promotion_progress(db, src.id, principal.shop_id))
+
+
+@router.post("/promotion/import", response_model=BulkImportOut)
+def bulk_import(
+    body: BulkImportBody, db: Session = Db, principal: Principal = Auth
+) -> BulkImportOut:
+    """Promote every ready, unambiguous staged medicine to a zero-stock,
+    unpriced product — idempotently and resumably."""
+    report = promoter.promote_batch(db, principal, limit=body.limit)
+    return BulkImportOut(**report.as_dict())

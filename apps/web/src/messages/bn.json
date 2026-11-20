@@ -274,6 +274,13 @@
         "file": "একটি বৈধ .csv বা .xlsx ফাইল বেছে নিন (সর্বোচ্চ ২ MB)",
         "unknown": "আমদানি ব্যর্থ হয়েছে। আবার চেষ্টা করুন।"
       }
+    },
+    "views": {
+      "all": "সব",
+      "inStock": "স্টকে আছে",
+      "outOfStock": "স্টকে নেই",
+      "missingPrice": "দাম নেই",
+      "medicines": "ঔষধ"
     }
   },
   "customers": {

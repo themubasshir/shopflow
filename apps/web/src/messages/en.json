@@ -274,6 +274,13 @@
         "file": "Choose a valid .csv or .xlsx file (max 2 MB)",
         "unknown": "Import failed. Please try again."
       }
+    },
+    "views": {
+      "all": "All",
+      "inStock": "In stock",
+      "outOfStock": "Out of stock",
+      "missingPrice": "Missing price",
+      "medicines": "Medicines"
     }
   },
   "customers": {

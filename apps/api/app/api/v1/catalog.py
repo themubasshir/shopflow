@@ -63,6 +63,11 @@ def list_products(
     category_id: str | None = Query(default=None),
     medicine_only: bool = False,
     low_stock_only: bool = False,
+    sellable: bool = False,
+    view: str | None = Query(
+        default=None,
+        description="Catalog view: in_stock | out_of_stock | missing_price | medicine",
+    ),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> Paginated[ProductOut]:
@@ -81,16 +86,38 @@ def list_products(
                 func.lower(Product.sku).like(like),
                 func.lower(Product.name_bn).like(like),
                 func.lower(Product.barcode).like(like),
-                select(1)
-                .select_from(alias)
-                .where(func.lower(alias.column).like(like))
-                .exists(),
+                select(1).select_from(alias).where(func.lower(alias.column).like(like)).exists(),
             )
         )
     if medicine_only:
         stmt = stmt.where(Product.is_medicine.is_(True))
+    if sellable:
+        # Billing default: only products that can actually be sold — stock on
+        # hand above zero AND a configured (non-zero) base sellable price.
+        # Imported MedEx catalog rows (0 stock, 0 price) are excluded here but
+        # remain visible in the catalog/purchasing searches.
+        base_price = (
+            select(ProductUnit.selling_price)
+            .where(ProductUnit.product_id == Product.id, ProductUnit.is_base.is_(True))
+            .scalar_subquery()
+        )
+        stmt = stmt.where(saleable > 0, func.coalesce(base_price, 0) > 0)
     if low_stock_only:
         stmt = stmt.where(saleable <= Product.low_stock_threshold)
+    if view:
+        base_price_sq = (
+            select(ProductUnit.selling_price)
+            .where(ProductUnit.product_id == Product.id, ProductUnit.is_base.is_(True))
+            .scalar_subquery()
+        )
+        if view == "in_stock":
+            stmt = stmt.where(saleable > 0)
+        elif view == "out_of_stock":
+            stmt = stmt.where(saleable <= 0)
+        elif view == "missing_price":
+            stmt = stmt.where(func.coalesce(base_price_sq, 0) <= 0)
+        elif view == "medicine":
+            stmt = stmt.where(Product.is_medicine.is_(True))
     if category_id:
         stmt = stmt.where(Category.id == category_id)
 
