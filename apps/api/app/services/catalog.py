@@ -350,6 +350,7 @@ def _product_detail(db: Session, product: Product) -> ProductDetailOut:
             mrp=m.mrp,
             purchase_cost=m.purchase_cost,
             retail_price=m.retail_price,
+            supplier_price=m.supplier_price,
             prescription_required=m.prescription_required,
         )
     return ProductDetailOut(
@@ -587,6 +588,7 @@ def _row_to_write(
             mrp=row.mrp,
             purchase_cost=row.purchase_cost,
             retail_price=row.retail_price or row.selling_price,
+            supplier_price=row.supplier_price,
             prescription_required=row.prescription_required,
         )
     return ProductWrite(
@@ -872,6 +874,7 @@ def _row_from_mapping(row_no: int, mapping: dict[str, str]) -> ProductImportRowM
         mrp=money("mrp"),
         purchase_cost=money("purchase_cost", "cost"),
         retail_price=money("retail_price"),
+        supplier_price=money("supplier_price", "supplier_cost"),
         prescription_required=boolean("prescription_required", "rx"),
     )
 

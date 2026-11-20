@@ -106,6 +106,7 @@ class MedicineWrite(Input):
     mrp: Money | None = None
     purchase_cost: Money | None = None
     retail_price: Money | None = None
+    supplier_price: Money | None = None
     prescription_required: bool = False
 
 
@@ -197,6 +198,7 @@ class ProductImportRowModel(Input):
     mrp: Money | None = None
     purchase_cost: Money | None = None
     retail_price: Money | None = None
+    supplier_price: Money | None = None
     prescription_required: bool = False
 
 
@@ -250,6 +252,7 @@ class ImportCommitRow(Input):
     mrp: Money | None = None
     purchase_cost: Money | None = None
     retail_price: Money | None = None
+    supplier_price: Money | None = None
     prescription_required: bool = False
 
 

@@ -168,6 +168,10 @@ class MedicineDetail(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     mrp: Mapped[Decimal | None] = mapped_column(MONEY)
     purchase_cost: Mapped[Decimal | None] = mapped_column(MONEY)
     retail_price: Mapped[Decimal | None] = mapped_column(MONEY)
+    supplier_price: Mapped[Decimal | None] = mapped_column(
+        MONEY,
+        comment="Reference supplier/cost price for profit-loss (retail - supplier).",
+    )
     prescription_required: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
@@ -187,6 +191,10 @@ class MedicineDetail(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("mrp IS NULL OR mrp >= 0", name="mrp_non_negative"),
         CheckConstraint(
             "retail_price IS NULL OR retail_price >= 0", name="retail_price_non_negative"
+        ),
+        CheckConstraint(
+            "supplier_price IS NULL OR supplier_price >= 0",
+            name="supplier_price_non_negative",
         ),
         Index("ix_medicine_details_generic_name", "generic_name"),
     )
