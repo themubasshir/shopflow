@@ -641,6 +641,162 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/medex/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source */
+        get: operations["get_source_api_v1_catalog_medex_source_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/medex/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["list_runs_api_v1_catalog_medex_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/medex/staging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Staging */
+        get: operations["list_staging_api_v1_catalog_medex_staging_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/medex/staging/filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Staging Filters
+         * @description Distinct manufacturers + generics for the filter dropdowns.
+         */
+        get: operations["staging_filters_api_v1_catalog_medex_staging_filters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/medex/staging/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Staging Stats */
+        get: operations["staging_stats_api_v1_catalog_medex_staging_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/medex/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Matches */
+        get: operations["list_matches_api_v1_catalog_medex_matches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/medex/staging/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_api_v1_catalog_medex_staging_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/medex/staging/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject */
+        post: operations["reject_api_v1_catalog_medex_staging_reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/medex/matches/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Match */
+        post: operations["decide_match_api_v1_catalog_medex_matches_decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/invoices/{invoice_id}/returns": {
         parameters: {
             query?: never;
@@ -1481,6 +1637,18 @@ export interface components {
             agent_id: string;
             /** Token */
             token: string;
+        };
+        /** ApproveBody */
+        ApproveBody: {
+            /**
+             * Staging Id
+             * Format: uuid
+             */
+            staging_id: string;
+            /** Selling Price */
+            selling_price?: number | string | null;
+            /** Link Product Id */
+            link_product_id?: string | null;
         };
         /** BatchOut */
         BatchOut: {
@@ -2750,6 +2918,44 @@ export interface components {
              */
             created_at: string;
         };
+        /** MatchBody */
+        MatchBody: {
+            /**
+             * Match Id
+             * Format: uuid
+             */
+            match_id: string;
+            /** Confirm */
+            confirm: boolean;
+        };
+        /** MatchOut */
+        MatchOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Staging Id
+             * Format: uuid
+             */
+            staging_id: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Basis */
+            basis: string;
+            /** Score */
+            score: number;
+            /** Status */
+            status: string;
+            /** Product Name En */
+            product_name_en?: string | null;
+            /** Product Sku */
+            product_sku?: string | null;
+        };
         /** MeOut */
         MeOut: {
             /**
@@ -3871,6 +4077,14 @@ export interface components {
             /** Reference */
             reference: string;
         };
+        /** RejectBody */
+        RejectBody: {
+            /**
+             * Staging Id
+             * Format: uuid
+             */
+            staging_id: string;
+        };
         /** ReportResponse */
         ReportResponse: {
             /** Status */
@@ -4057,6 +4271,45 @@ export interface components {
             /** Name Bn */
             name_bn: string;
         };
+        /** RunOut */
+        RunOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Scope */
+            scope: string;
+            /** Status */
+            status: string;
+            /** Index Start */
+            index_start: number;
+            /** Index Limit */
+            index_limit: number | null;
+            /** Detail Limit */
+            detail_limit: number | null;
+            /** Last Index Page */
+            last_index_page: number;
+            /** Last Page Seen */
+            last_page_seen: number | null;
+            /** Discovered */
+            discovered: number;
+            /** Fetched */
+            fetched: number;
+            /** Staged */
+            staged: number;
+            /** Failed */
+            failed: number;
+            /**
+             * Pending Count
+             * @default 0
+             */
+            pending_count: number;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+        };
         /** SalesPoint */
         SalesPoint: {
             /**
@@ -4068,6 +4321,114 @@ export interface components {
             sales: string;
             /** Invoice Count */
             invoice_count: number;
+        };
+        /** SourceOut */
+        SourceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Base Url */
+            base_url: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Consent Note */
+            consent_note?: string | null;
+            /** Consent Recorded At */
+            consent_recorded_at?: string | null;
+        };
+        /** StagingListOut */
+        StagingListOut: {
+            /** Rows */
+            rows: components["schemas"]["StagingOut"][];
+            /** Total */
+            total: number;
+            /** Offset */
+            offset: number;
+            /** Limit */
+            limit: number;
+        };
+        /** StagingOut */
+        StagingOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** External Id */
+            external_id: string;
+            /** Source Url */
+            source_url: string;
+            /** Slug */
+            slug: string | null;
+            /** Brand Name */
+            brand_name: string | null;
+            /** Brand Name Bn */
+            brand_name_bn: string | null;
+            /** Generic Name */
+            generic_name: string | null;
+            /** Generic Name Bn */
+            generic_name_bn: string | null;
+            /** Manufacturer */
+            manufacturer: string | null;
+            /** Manufacturer Bn */
+            manufacturer_bn: string | null;
+            /** Strength */
+            strength: string | null;
+            /** Strength Bn */
+            strength_bn: string | null;
+            /** Dosage Form */
+            dosage_form: string | null;
+            /** Dosage Form Bn */
+            dosage_form_bn: string | null;
+            /** Unit Price */
+            unit_price: string | null;
+            /** Strip Price */
+            strip_price: string | null;
+            /** Pack Price */
+            pack_price: string | null;
+            /** Pack Quantity */
+            pack_quantity: number | null;
+            /** Units Per Pack */
+            units_per_pack: number | null;
+            /** Pack Label */
+            pack_label: string | null;
+            /** Therapeutic Class */
+            therapeutic_class: string | null;
+            /** Prescription Note */
+            prescription_note: string | null;
+            /** Validation Status */
+            validation_status: string;
+            /** Import Status */
+            import_status: string;
+            /** Parse Warnings */
+            parse_warnings: unknown[];
+            /** Source Fetched At */
+            source_fetched_at: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Linked Product Id */
+            linked_product_id: string | null;
+            /** Content Hash */
+            content_hash: string | null;
+        };
+        /** StatsOut */
+        StatsOut: {
+            /** Total */
+            total: number;
+            /** By Status */
+            by_status: {
+                [key: string]: unknown;
+            };
+            /** Missing Price */
+            missing_price: number;
+            /** Match Candidates */
+            match_candidates: number;
         };
         /** StockChange */
         StockChange: {
@@ -5767,6 +6128,266 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockValue"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_api_v1_catalog_medex_source_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOut"];
+                };
+            };
+        };
+    };
+    list_runs_api_v1_catalog_medex_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_staging_api_v1_catalog_medex_staging_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                manufacturer?: string | null;
+                generic?: string | null;
+                status?: string | null;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagingListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staging_filters_api_v1_catalog_medex_staging_filters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    staging_stats_api_v1_catalog_medex_staging_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsOut"];
+                };
+            };
+        };
+    };
+    list_matches_api_v1_catalog_medex_matches_get: {
+        parameters: {
+            query?: {
+                staging_id?: string | null;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_v1_catalog_medex_staging_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_v1_catalog_medex_staging_reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_match_api_v1_catalog_medex_matches_decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchOut"];
                 };
             };
             /** @description Validation Error */

@@ -453,15 +453,19 @@
     "next": "Next",
     "empty": "Nothing staged yet",
     "emptyHint": "Run the MedEx collector to stage medicines for review.",
-    "status.pending_review": "Pending review",
-    "status.staged": "Staged",
-    "status.imported": "Imported",
-    "status.matched": "Matched",
-    "status.rejected": "Rejected",
-    "status.failed": "Failed",
-    "validation.valid": "Valid",
-    "validation.warning": "Needs review",
-    "validation.invalid": "Incomplete data",
+    "importStatus": {
+      "pending_review": "Pending review",
+      "staged": "Staged",
+      "imported": "Imported",
+      "matched": "Matched",
+      "rejected": "Rejected",
+      "failed": "Failed"
+    },
+    "validationStatus": {
+      "valid": "Valid",
+      "warning": "Needs review",
+      "invalid": "Incomplete data"
+    },
     "errors": {
       "approve": "Could not approve — it may already be imported.",
       "reject": "Could not reject this entry.",

@@ -169,7 +169,10 @@ export function MedexClient({
       {stats && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label={t("staged")} value={stats.total} />
-          <Stat label={t("pending")} value={stats.by_status?.pending_review ?? 0} />
+          <Stat
+            label={t("pending")}
+            value={Number(stats.by_status?.pending_review ?? 0)}
+          />
           <Stat label={t("missingPrice")} value={stats.missing_price} />
           <Stat label={t("matchCandidates")} value={stats.match_candidates} />
         </div>
@@ -207,7 +210,7 @@ export function MedexClient({
           <select value={status} onChange={(e) => setStatus(e.target.value)} className={fieldClass} aria-label={t("status")}>
             <option value="">{t("allStatus")}</option>
             {STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>{t(`status.${s}` as never)}</option>
+              <option key={s} value={s}>{t(`importStatus.${s}` as never)}</option>
             ))}
           </select>
           <select value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} className={fieldClass} aria-label={t("manufacturer")}>
@@ -368,10 +371,10 @@ function StagingRow({
                   : "warning"
           }
         >
-          {t(`status.${row.import_status}` as never)}
+          {t(`importStatus.${row.import_status}` as never)}
         </Badge>
         {row.validation_status !== "valid" && (
-          <p className="mt-1 text-[10px] text-amber-700">{t(`validation.${row.validation_status}` as never)}</p>
+          <p className="mt-1 text-[10px] text-amber-700">{t(`validationStatus.${row.validation_status}` as never)}</p>
         )}
       </td>
       <td className="px-3 py-2">

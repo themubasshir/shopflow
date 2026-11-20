@@ -104,19 +104,36 @@ def run_import(
             break
         parsed = parse_index(html, url)
         last_seen = parsed.last_page or last_seen
+        # Persist the deduplicated manifest (one row per external_id) so each
+        # discovered medicine keeps index-page provenance + a retry budget.
+        for card in parsed.cards:
+            ck.upsert_manifest(
+                db,
+                run,
+                source_id=source.id,
+                external_id=card.source_id,
+                url=card.url,
+                brand_label=card.brand_name,
+                index_page=page,
+            )
         ck.save_index_progress(
             db, run, page=page, new_urls=[c.url for c in parsed.cards], last_page_seen=last_seen
         )
         db.commit()
         logger.info("medex index page=%d cards=%d last=%s", page, len(parsed.cards), last_seen)
-        # Stop discovering once we have enough queued for a capped pilot.
-        if run.detail_limit is not None and len(run.pending_urls or []) >= run.detail_limit:
-            run.pending_urls = (run.pending_urls or [])[: run.detail_limit]
-            db.commit()
-            break
         if not parsed.cards:  # empty page -> end of catalogue
             break
         page += 1
+        # When the caller set an explicit index range, keep scanning it so the
+        # manifest reflects every requested page. When they didn't, a capped
+        # detail pilot only needs enough URLs queued to satisfy detail_limit —
+        # stop early instead of crawling the whole index for a 12-detail run.
+        if (
+            run.index_limit is None
+            and run.detail_limit is not None
+            and len(run.pending_urls or []) >= run.detail_limit
+        ):
+            break
 
     # ---- Phase 2: detail fetch + stage -------------------------------------
     detail_fetcher = detail_fetcher or fetcher

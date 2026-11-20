@@ -453,15 +453,19 @@
     "next": "পরের",
     "empty": "এখনও কিছু স্টেজড নেই",
     "emptyHint": "পর্যালোচনার জন্য ঔষধ স্টেজ করতে MedEx সংগ্রাহক চালান।",
-    "status.pending_review": "পর্যালোচনার অপেক্ষায়",
-    "status.staged": "স্টেজড",
-    "status.imported": "আমদানি হয়েছে",
-    "status.matched": "মিলেছে",
-    "status.rejected": "বাতিল",
-    "status.failed": "ব্যর্থ",
-    "validation.valid": "বৈধ",
-    "validation.warning": "পর্যালোচনা প্রয়োজন",
-    "validation.invalid": "অসম্পূর্ণ তথ্য",
+    "importStatus": {
+      "pending_review": "পর্যালোচনার অপেক্ষায়",
+      "staged": "স্টেজড",
+      "imported": "আমদানি হয়েছে",
+      "matched": "মিলেছে",
+      "rejected": "বাতিল",
+      "failed": "ব্যর্থ"
+    },
+    "validationStatus": {
+      "valid": "বৈধ",
+      "warning": "পর্যালোচনা প্রয়োজন",
+      "invalid": "অসম্পূর্ণ তথ্য"
+    },
     "errors": {
       "approve": "অনুমোদন করা গেল না — সম্ভবত এটি আগে থেকেই আমদানি হয়েছে।",
       "reject": "এই এন্ট্রি বাতিল করা গেল না।",

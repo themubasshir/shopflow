@@ -57,9 +57,21 @@ def _report(db, run: MedicineCatalogImportRun, source) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Authorized MedEx catalog pilot collector")
-    p.add_argument("--index-pages", type=int, default=2, help="index pages to scan")
-    p.add_argument("--details", type=int, default=30, help="max detail pages to fetch")
+    p = argparse.ArgumentParser(description="Authorized MedEx catalog collector")
+    p.add_argument("--index-start", type=int, default=1, help="first index page to scan")
+    p.add_argument(
+        "--index-pages",
+        type=int,
+        default=None,
+        help="index pages to scan (omit = all discovered pages)",
+    )
+    p.add_argument(
+        "--details",
+        type=int,
+        default=None,
+        help="cap on detail fetches this run (omit = every discovered URL)",
+    )
+    p.add_argument("--scope", default="pilot", choices=["pilot", "full"], help="run scope label")
     p.add_argument("--bn", action="store_true", help="also fetch /bn Bangla variants")
     p.add_argument("--interval", type=float, default=2.0, help="seconds between requests")
     p.add_argument("--resume", type=str, default=None, help="resume run UUID")
@@ -87,15 +99,16 @@ def main(argv: list[str] | None = None) -> int:
                 run = create_run(
                     db,
                     source,
-                    scope="pilot",
-                    index_start=1,
+                    scope=args.scope,
+                    index_start=args.index_start,
                     index_limit=args.index_pages,
                     detail_limit=args.details,
                 )
                 db.commit()
                 print(
-                    f"Starting pilot run {run.id}: index≤{args.index_pages} "
-                    f"details≤{args.details} bn={args.bn} interval={args.interval}s"
+                    f"Starting {args.scope} run {run.id}: index {args.index_start}+"
+                    f"{args.index_pages or 'all'} details≤{args.details or 'all'} "
+                    f"bn={args.bn} interval={args.interval}s"
                 )
                 run = run_import(db, fetcher, run, fetch_bn=args.bn)
             _report(db, run, source)

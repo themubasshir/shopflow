@@ -98,6 +98,45 @@ class MedicineCatalogImportRun(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (Index("ix_medicine_runs_source_status", "source_id", "status"),)
 
 
+class MedicineCatalogManifest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """One detail URL discovered on a brand-index page.
+
+    Phase 3B: persists the deduplicated work manifest separately from the run's
+    ``pending_urls`` queue so each discovered medicine keeps its index-page
+    provenance and a per-URL ``attempts`` counter (bounding retries so a
+    permanently-failing page can no longer re-queue forever and stall a run).
+    ``(source_id, external_id)`` is unique — re-discovery of the same brand
+    updates provenance in place rather than duplicating the row.
+    """
+
+    __tablename__ = "medicine_catalog_manifest"
+
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("medicine_catalog_sources.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("medicine_catalog_import_runs.id", ondelete="SET NULL")
+    )
+    external_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    brand_label: Mapped[str | None] = mapped_column(String(200))
+    index_page: Mapped[int | None] = mapped_column(Integer)
+    discovered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # fetch bookkeeping — attempts bounds retrying a persistently-failing URL
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    state: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="pending"
+    )  # pending|staged|failed|skipped
+
+    __table_args__ = (
+        UniqueConstraint("source_id", "external_id", name="uq_medicine_manifest_source_external"),
+        Index("ix_medicine_manifest_state", "state"),
+        Index("ix_medicine_manifest_run", "run_id"),
+    )
+
+
 class MedicineCatalogStaging(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """One scraped medicine, keyed by (source, external_id)."""
 

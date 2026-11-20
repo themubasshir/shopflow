@@ -26,6 +26,7 @@ from app.models.loyalty import (
 )
 from app.models.medex import (
     MedicineCatalogImportRun,
+    MedicineCatalogManifest,
     MedicineCatalogMatch,
     MedicineCatalogSource,
     MedicineCatalogStaging,
@@ -65,6 +66,7 @@ __all__ = [
     "LoyaltyTransaction",
     "MedicineBatch",
     "MedicineCatalogImportRun",
+    "MedicineCatalogManifest",
     "MedicineCatalogMatch",
     "MedicineCatalogSource",
     "MedicineCatalogStaging",

@@ -20,6 +20,7 @@ from sqlalchemy import func, select
 from app.api.deps import Principal
 from app.core.errors import ConflictError
 from app.db.session import SessionLocal
+from app.integrations.medex import checkpoints as ck
 from app.integrations.medex.approver import approve_staging, reject_staging, set_match_status
 from app.integrations.medex.detail_parser import parse_detail
 from app.integrations.medex.importer import run_import
@@ -33,6 +34,7 @@ from app.integrations.medex.repository import (
     staging_stats,
 )
 from app.models import (
+    MedicineCatalogManifest,
     MedicineCatalogStaging,
     Product,
     Shop,
@@ -129,6 +131,7 @@ def _purge_medex_artifacts(db):
     from app.models import (
         MedicineBatch,
         MedicineCatalogImportRun,
+        MedicineCatalogManifest,
         MedicineCatalogMatch,
         MedicineCatalogStaging,
         MedicineCatalogSyncHistory,
@@ -140,6 +143,7 @@ def _purge_medex_artifacts(db):
     db.execute(MedicineCatalogSyncHistory.__table__.delete())
     db.execute(MedicineCatalogMatch.__table__.delete())
     db.execute(MedicineCatalogStaging.__table__.delete())
+    db.execute(MedicineCatalogManifest.__table__.delete())
     db.execute(MedicineCatalogImportRun.__table__.delete())
     med_ids = select(Product.id).where(Product.sku.like("MED-%"))
     db.execute(delete(MedicineBatch).where(MedicineBatch.product_id.in_(med_ids)))
@@ -443,3 +447,146 @@ def test_unauthorized_import_blocked(shop):
         )
         with pytest.raises(HTTPException):
             approve_staging(db, cashier, row.id)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3B: manifest, bounded retry, resume/dedup, catalog integrity
+# ---------------------------------------------------------------------------
+
+
+def _manifest_rows(db, src):
+    return db.scalars(
+        select(MedicineCatalogManifest).where(MedicineCatalogManifest.source_id == src.id)
+    ).all()
+
+
+def test_manifest_records_index_provenance_and_dedupes(actor):
+    """Index discovery writes one manifest row per external_id with index_page
+    + discovered_at; re-running discovery dedupes rather than doubling rows."""
+    with SessionLocal() as db:
+        src = get_or_create_source(db)
+        run = create_run(db, src, scope="full", index_start=1, index_limit=1, detail_limit=1)
+        db.commit()
+        fetcher = FixtureFetcher(["index_p1.html"])
+        # Only Phase 1 (index) matters; detail_limit=1 keeps the detail phase tiny.
+        run_import(db, fetcher, run, fetch_bn=False)
+        db.commit()
+        rows = _manifest_rows(db, src)
+        assert rows, "expected manifest rows from index discovery"
+        assert all(r.index_page == 1 for r in rows)
+        assert all(r.discovered_at is not None for r in rows)
+        assert all(r.external_id for r in rows)
+        assert all(r.url.startswith("https://medex.com.bd/brands/") for r in rows)
+        # deduped on (source, external_id)
+        ids = [r.external_id for r in rows]
+        assert len(ids) == len(set(ids))
+
+
+def test_failed_detail_bounded_by_attempts(actor):
+    """A URL that always raises FetchError is retried at most
+    MAX_DETAIL_ATTEMPTS times, then dropped from the queue and marked failed —
+    the run terminates rather than re-queuing forever."""
+    from app.integrations.medex.client import FetchError
+
+    class AlwaysFails(FixtureFetcher):
+        def fetch_detail(self, url):
+            self.detail_calls.append(url)
+            raise FetchError(url, 500, "boom")
+
+    with SessionLocal() as db:
+        src = get_or_create_source(db)
+        run = create_run(db, src, scope="pilot", index_start=1, index_limit=1, detail_limit=3)
+        db.commit()
+        fetcher = AlwaysFails(["index_p1.html"])
+        run = run_import(db, fetcher, run, fetch_bn=False)
+        db.commit()
+        # run terminated (not stuck re-queuing) and reported the failures
+        assert run.status in {"completed", "failed", "interrupted"}
+        assert run.failed >= 1
+        # bounded retry: the first failed URL was retried at most
+        # MAX_DETAIL_ATTEMPTS times then dropped, NOT re-queued forever.
+        from collections import Counter
+
+        attempts = Counter(fetcher.detail_calls)
+        assert max(attempts.values()) <= ck.MAX_DETAIL_ATTEMPTS, attempts
+        # a URL whose budget is exhausted is absent from the retry queue
+        exhausted = [u for u, n in attempts.items() if n >= ck.MAX_DETAIL_ATTEMPTS]
+        for u in exhausted:
+            assert u not in run.pending_urls
+        # errors captured with url + attempt bookkeeping
+        assert run.errors and "url" in run.errors[0]
+
+
+def test_content_hash_update_records_sync_history(actor):
+    """Re-staging with a changed detail updates the row + writes a
+    MedicineCatalogSyncHistory entry for the changed tracked field."""
+    from app.models import MedicineCatalogSyncHistory
+
+    with SessionLocal() as db:
+        src = get_or_create_source(db)
+        d = _parse("detail_tablet.html", "https://medex.com.bd/brands/88004/x")
+        d.source_id = "88004"
+        row, _ = stage_detail(db, src, None, d)
+        db.commit()
+        # mutate a tracked field and re-stage
+        d2 = _parse("detail_tablet.html", "https://medex.com.bd/brands/88004/x")
+        d2.source_id = "88004"
+        d2.brand_name = "A-B1 Renamed"
+        d2.content_hash = "deadbeef" * 8
+        row2, action = stage_detail(db, src, None, d2)
+        db.commit()
+        assert row2.id == row.id and action == "updated"
+        hist = db.scalars(
+            select(MedicineCatalogSyncHistory).where(
+                MedicineCatalogSyncHistory.staging_id == row.id
+            )
+        ).all()
+        assert any(h.field == "brand_name" for h in hist)
+
+
+def test_pagination_discovered_not_assumed():
+    """last_page comes from the page's own pagination links; a page without a
+    pagination block yields last_page=None (never a hardcoded total)."""
+    p1 = parse_index(_fixture("index_p1.html"), "https://medex.com.bd/brands")
+    assert p1.last_page == 859
+    p2 = parse_index(_fixture("index_p2.html"), "https://medex.com.bd/brands?page=2")
+    assert p2.last_page == 859
+    bare = parse_index("<html><body><a class='brand-card' href='/brands/1/x'>x</a></body></html>")
+    assert bare.last_page is None  # no pagination block -> None, not a guess
+
+
+def test_malformed_detail_does_not_crash(actor):
+    """A structurally broken detail page stages as a warning/invalid row rather
+    than raising — the collector records it and keeps going."""
+    with SessionLocal() as db:
+        src = get_or_create_source(db)
+        # minimal but well-formed URL id; garbage body
+        d = parse_detail(
+            "<html><body><p>oops</p></body></html>", "https://medex.com.bd/brands/88099/broken"
+        )
+        row, _ = stage_detail(db, src, None, d)
+        db.commit()
+        assert row.external_id == "88099"
+        assert row.validation_status in {"warning", "invalid"}
+        assert row.parse_warnings  # something was flagged
+
+
+def test_existing_catalog_untouched_by_staging(actor):
+    """Staging a batch of medicines changes no products, prices, stock, or
+    batches — the staging area is inert until owner approval."""
+    from app.models import MedicineBatch, ProductUnit
+
+    with SessionLocal() as db:
+        src = get_or_create_source(db)
+        before_products = db.scalar(select(func.count(Product.id)))
+        before_units = db.scalar(select(func.count(ProductUnit.id)))
+        before_batches = db.scalar(select(func.count(MedicineBatch.id)))
+        before_moves = db.scalar(select(func.count(StockMovement.id)))
+        run = create_run(db, src, scope="pilot", index_start=1, index_limit=1, detail_limit=4)
+        db.commit()
+        run_import(db, FixtureFetcher(["index_p1.html"]), run, fetch_bn=False)
+        db.commit()
+        assert db.scalar(select(func.count(Product.id))) == before_products
+        assert db.scalar(select(func.count(ProductUnit.id))) == before_units
+        assert db.scalar(select(func.count(MedicineBatch.id))) == before_batches
+        assert db.scalar(select(func.count(StockMovement.id))) == before_moves
