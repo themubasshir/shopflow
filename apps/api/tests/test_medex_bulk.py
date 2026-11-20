@@ -221,14 +221,16 @@ def test_bulk_import_creates_zero_stock_unpriced(actor):
         p = db.get(Product, staging.linked_product_id)
         assert p.sku.startswith("MED-") and p.is_medicine
         assert p.stock_on_hand == 0  # zero stock, always
-        # unpriced base unit (selling_price 0), MRP kept on medicine_details
+        # sellable at the MedEx MRP: base unit + retail both carry the
+        # reference price (owner directive: MRP == retail). Still zero stock.
         base = db.scalar(
             select(ProductUnit).where(ProductUnit.product_id == p.id, ProductUnit.is_base.is_(True))
         )
-        assert base.selling_price == 0
         med = db.scalar(select(MedicineDetail).where(MedicineDetail.product_id == p.id))
         assert med.source == "medex"
         assert med.mrp is not None  # reference price preserved separately
+        assert med.retail_price == med.mrp
+        assert base.selling_price == med.mrp
         # no inventory or financial side effects
         after = _counts(db)
         assert after["moves"] == before["moves"]

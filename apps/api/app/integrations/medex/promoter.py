@@ -159,6 +159,7 @@ def _build_product_write(
     name_bn = row.brand_name_bn or name_en
     sku = comfortable_sku(row.brand_name, row.external_id)
 
+    mrp = row.unit_price or row.strip_price or row.pack_price
     med = MedicineWrite(
         brand_name=row.brand_name or name_en,
         generic_name=row.generic_name or name_en,
@@ -166,8 +167,11 @@ def _build_product_write(
         strength=row.strength,
         dosage_form=row.dosage_form,
         pack_size=row.pack_label,
-        mrp=row.unit_price or row.strip_price or row.pack_price,
-        retail_price=None,  # never auto-price
+        mrp=mrp,
+        # Owner directive: retail price defaults to the MedEx MRP so imported
+        # items are immediately sellable at reference price. Items with no MRP
+        # stay unpriced (selling_price=0) until configured.
+        retail_price=mrp,
         prescription_required=bool(row.prescription_note),
     )
     unit = _base_unit(row.dosage_form)
@@ -185,7 +189,7 @@ def _build_product_write(
                 name=unit,
                 name_bn=_base_unit_bn(row.dosage_form),
                 conversion_factor=Decimal("1"),
-                selling_price=Decimal("0"),  # 0 = "price not configured"
+                selling_price=mrp if mrp is not None else Decimal("0"),
                 is_base=True,
             )
         ],
