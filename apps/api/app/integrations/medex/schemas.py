@@ -1,14 +1,12 @@
-"""Pydantic shapes for MedEx-extracted data.
+"""Pydantic shapes for MedEx-derived data.
 
-Two layers:
-
-* ``IndexCard``    — one ``.brand-card`` on a ``/brands`` index page. Carries
-  the stable numeric source id parsed from the ``/brands/{id}/{slug}`` URL.
-* ``MedicineDetail`` — a fully parsed ``/brands/{id}/...`` detail page.
+``MedicineDetail`` is the canonical record for one medicine, whether it came
+from the live scraper (removed) or the offline dataset importer.
+``PackInfo`` carries the packaging/price breakdown parsed from the source.
 
 Prices are ``Decimal``; a missing price is ``None`` — never guessed or
 inferred. ``raw`` keeps the literal source strings so re-parsing later can be
-audited against what the page actually said.
+audited against what the source actually said.
 """
 
 from __future__ import annotations
@@ -23,28 +21,6 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class IndexCard(BaseModel):
-    """One brand card discovered on a /brands index page."""
-
-    source_id: str  # numeric id from /brands/{id}/{slug}
-    url: str  # canonical absolute detail URL (no /bn, no query)
-    slug: str  # trailing url slug
-    brand_name: str
-    strength: str | None = None
-    generic_name: str | None = None
-    manufacturer: str | None = None
-    dosage_form: str | None = None  # from the card's dosage icon title
-
-
-class IndexPage(BaseModel):
-    """Result of parsing one index page."""
-
-    cards: list[IndexCard] = Field(default_factory=list)
-    page_number: int | None = None  # current page, if determinable
-    last_page: int | None = None  # highest page number seen in pagination
-    next_page_url: str | None = None
-
-
 class PackInfo(BaseModel):
     """A packaging price line like ``(10 x 10: ৳ 86.00)``."""
 
@@ -57,7 +33,7 @@ class PackInfo(BaseModel):
 
 
 class MedicineDetail(BaseModel):
-    """A parsed MedEx brand detail page."""
+    """A medicine record — a parsed detail page or a dataset row."""
 
     source_id: str
     url: str

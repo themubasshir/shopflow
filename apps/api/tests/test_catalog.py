@@ -20,7 +20,16 @@ from app.api.deps import Principal
 from app.core.errors import ConflictError, ValidationError
 from app.db.session import SessionLocal
 from app.main import app
-from app.models import Category, Counter, InvoiceItem, MedicineBatch, MedicineDetail, Product, Shop, User
+from app.models import (
+    Category,
+    Counter,
+    InvoiceItem,
+    MedicineBatch,
+    MedicineDetail,
+    Product,
+    Shop,
+    User,
+)
 from app.schemas.catalog import (
     CategoryWrite,
     MedicineWrite,

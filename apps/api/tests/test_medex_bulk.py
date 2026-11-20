@@ -3,13 +3,12 @@
 Covers the MedEx staging -> products bulk import: classification, idempotent
 re-runs, zero-stock/zero-price invariants, duplicate handling, resume, and the
 billing/catalog separation that keeps unstocked imported medicines unsellable.
-Runs entirely against saved fixtures + the real catalog tables — no live site.
+``MedicineDetail`` records are built directly — no scraped HTML parsing.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -17,7 +16,6 @@ from sqlalchemy import func, select
 
 from app.api.deps import Principal
 from app.db.session import SessionLocal
-from app.integrations.medex.detail_parser import parse_detail
 from app.integrations.medex.normalizer import comfortable_sku
 from app.integrations.medex.promoter import PromoteReport, classify, promote_batch
 from app.integrations.medex.repository import (
@@ -25,6 +23,7 @@ from app.integrations.medex.repository import (
     get_or_create_source,
     stage_detail,
 )
+from app.integrations.medex.schemas import MedicineDetail as MedexDetail
 from app.models import (
     MedicineBatch,
     MedicineCatalogStaging,
@@ -37,16 +36,6 @@ from app.models import (
 )
 from app.schemas.catalog import ProductUnitWrite, ProductWrite
 from app.services.catalog import create_product
-
-FIX = Path(__file__).parent / "fixtures" / "medex"
-
-
-def _fixture(name: str) -> str:
-    return (FIX / name).read_text(encoding="utf-8")
-
-
-def _parse(name: str, url: str):
-    return parse_detail(_fixture(name), url)
 
 
 def _purge(db):
@@ -108,11 +97,25 @@ def _uniq(prefix: str) -> str:
     return f"{prefix}-{uuid4().hex[:8].upper()}"
 
 
-def _stage(db, src, name, url, ext_id=None):
-    d = _parse(name, url)
-    if ext_id:
-        d.source_id = ext_id
-    row, _ = stage_detail(db, src, None, d)
+def _detail(source_id: str, **over) -> MedexDetail:
+    """Build a MedicineDetail directly — no HTML parsing needed."""
+    base = {
+        "source_id": source_id,
+        "url": f"https://medex.com.bd/brands/{source_id}/x",
+        "slug": "x",
+        "brand_name": "A-B1",
+        "generic_name": "Thiamine Hydrochloride",
+        "manufacturer": "ACME Laboratories Ltd.",
+        "strength": "100 mg",
+        "dosage_form": "Tablet",
+        "unit_price": Decimal("0.86"),
+    }
+    base.update(over)
+    return MedexDetail.model_validate(base)
+
+
+def _stage(db, src, source_id, **over):
+    row, _ = stage_detail(db, src, None, _detail(source_id, **over))
     return row
 
 
@@ -133,7 +136,7 @@ def _counts(db):
 def test_classify_ready_valid_row(actor):
     with SessionLocal() as db:
         src = get_or_create_source(db)
-        row = _stage(db, src, "detail_tablet.html", "https://medex.com.bd/brands/77100/x")
+        row = _stage(db, src, "77100")
         db.commit()
         assert classify(db, db.get(MedicineCatalogStaging, row.id), actor.shop_id) == "ready"
 
@@ -141,12 +144,12 @@ def test_classify_ready_valid_row(actor):
 def test_classify_invalid_no_brand(actor):
     with SessionLocal() as db:
         src = get_or_create_source(db)
-        d = _parse("detail_tablet.html", "https://medex.com.bd/brands/77101/x")
-        d.source_id = "77101"
-        d.brand_name = None
-        d.brand_name_bn = None
-        d.generic_name = None
-        row, _ = stage_detail(db, src, None, d)
+        row, _ = stage_detail(
+            db,
+            src,
+            None,
+            _detail("77101", brand_name=None, brand_name_bn=None, generic_name=None),
+        )
         db.commit()
         cls = classify(db, db.get(MedicineCatalogStaging, row.id), actor.shop_id)
         assert cls in {"invalid", "ambiguous"}
@@ -155,7 +158,7 @@ def test_classify_invalid_no_brand(actor):
 def test_classify_imported_when_sku_exists(actor):
     with SessionLocal() as db:
         src = get_or_create_source(db)
-        row = _stage(db, src, "detail_tablet.html", "https://medex.com.bd/brands/77102/x")
+        row = _stage(db, src, "77102")
         db.commit()
         # manually mint the deterministic SKU as a product
         sku = comfortable_sku(row.brand_name, row.external_id)
@@ -185,10 +188,7 @@ def test_classify_imported_when_sku_exists(actor):
 def test_classify_non_medicine_device(actor):
     with SessionLocal() as db:
         src = get_or_create_source(db)
-        d = _parse("detail_tablet.html", "https://medex.com.bd/brands/77103/x")
-        d.source_id = "77103"
-        d.dosage_form = "Glucometer"
-        row, _ = stage_detail(db, src, None, d)
+        row, _ = stage_detail(db, src, None, _detail("77103", dosage_form="Glucometer"))
         db.commit()
         assert classify(db, db.get(MedicineCatalogStaging, row.id), actor.shop_id) == "non_medicine"
 
@@ -208,7 +208,7 @@ def test_bulk_import_creates_zero_stock_unpriced(actor):
     with SessionLocal() as db:
         src = get_or_create_source(db)
         before = _counts(db)
-        row = _stage(db, src, "detail_tablet.html", "https://medex.com.bd/brands/77200/x")
+        row = _stage(db, src, "77200")
         db.commit()
         rep = promote_batch(db, actor, limit=50)
         db.commit()
@@ -240,7 +240,7 @@ def test_bulk_import_creates_zero_stock_unpriced(actor):
 def test_bulk_import_idempotent(actor):
     with SessionLocal() as db:
         src = get_or_create_source(db)
-        _stage(db, src, "detail_tablet.html", "https://medex.com.bd/brands/77201/x")
+        _stage(db, src, "77201")
         db.commit()
         promote_batch(db, actor, limit=100)
         n1 = db.scalar(select(func.count(Product.id)).where(Product.sku.like("MED-%")))
@@ -256,10 +256,8 @@ def test_bulk_import_resume_by_limit(actor):
     with SessionLocal() as db:
         src = get_or_create_source(db)
         # stage several distinct medicines
-        for i, fid in enumerate(["detail_tablet.html", "detail_capsule.html", "detail_syrup.html"]):
-            d = _parse(fid, f"https://medex.com.bd/brands/773{i}0/x")
-            d.source_id = f"773{i}0"
-            stage_detail(db, src, None, d)
+        for i, form in enumerate(["Tablet", "Capsule", "Syrup"]):
+            stage_detail(db, src, None, _detail(f"773{i}0", dosage_form=form))
         db.commit()
         rep = PromoteReport()
         promote_batch(db, actor, limit=1, report=rep)
@@ -274,10 +272,7 @@ def test_same_brand_different_strengths_both_import(actor):
     with SessionLocal() as db:
         src = get_or_create_source(db)
         for i, strength in enumerate(["100 mg", "200 mg"]):
-            d = _parse("detail_tablet.html", f"https://medex.com.bd/brands/774{i}0/x")
-            d.source_id = f"774{i}0"
-            d.strength = strength
-            stage_detail(db, src, None, d)
+            stage_detail(db, src, None, _detail(f"774{i}0", strength=strength))
         db.commit()
         promote_batch(db, actor, limit=50)
         # each produces its own MED- SKU (external_id differs)
@@ -313,15 +308,13 @@ def test_pending_match_kept_in_review(actor):
         )
         db.commit()
         # stage a row that fuzzy-matches it
-        d = _parse("detail_tablet.html", "https://medex.com.bd/brands/77500/x")
-        d.source_id = "77500"
-        row, _ = stage_detail(db, src, None, d)
+        row, _ = stage_detail(db, src, None, _detail("77500"))
         db.commit()
         find_match_candidates(db, actor.shop_id, row)
         db.commit()
         cls = classify(db, db.get(MedicineCatalogStaging, row.id), actor.shop_id)
-        # ambiguous (pending match) OR ready if the fixture didn't match —
-        # the invariant is it must NOT be auto-imported as a fresh product
+        # ambiguous (pending match) OR ready if it didn't match — the invariant
+        # is it must NOT be auto-imported as a fresh product
         promote_batch(db, actor, limit=100)
         if cls == "ambiguous":
             assert db.get(MedicineCatalogStaging, row.id).import_status != "imported"
@@ -347,7 +340,7 @@ def test_imported_medicine_excluded_from_sellable(actor):
 
     with SessionLocal() as db:
         src = get_or_create_source(db)
-        _stage(db, src, "detail_tablet.html", "https://medex.com.bd/brands/77600/x")
+        _stage(db, src, "77600")
         db.commit()
         promote_batch(db, actor, limit=50)
         db.commit()
@@ -378,7 +371,7 @@ def test_catalog_includes_imports(actor):
     """Imported medicines DO appear in the general catalog listing (not sellable filter)."""
     with SessionLocal() as db:
         src = get_or_create_source(db)
-        _stage(db, src, "detail_tablet.html", "https://medex.com.bd/brands/77700/x")
+        _stage(db, src, "77700")
         db.commit()
         promote_batch(db, actor, limit=50)
         db.commit()
@@ -422,71 +415,9 @@ def test_manual_products_never_overwritten(actor):
         )
         db.commit()
         manual_id = manual.id
-        _stage(db, src, "detail_tablet.html", "https://medex.com.bd/brands/77800/x")
+        _stage(db, src, "77800")
         db.commit()
         promote_batch(db, actor, limit=100)
         db.commit()
         p = db.get(Product, manual_id)
         assert p.sku == manual_sku and p.name_en == "Rice 5kg"
-
-
-# ---------------------------------------------------------------------------
-# Security-gate detection (MedEx captcha-challenge)
-# ---------------------------------------------------------------------------
-
-CAPTCHA_HTML = """<!DOCTYPE html><html><head><title>Security Check | MedEx</title>
-<meta name="l-csrf-token" content="x"></head><body><form id="captcha-challenge">
-<p>Verify you are human</p></form></body></html>"""
-
-
-def test_looks_like_gate_flags_captcha():
-    from app.integrations.medex.importer import _looks_like_gate
-
-    assert _looks_like_gate(CAPTCHA_HTML, "https://medex.com.bd/brands/5/x")
-    assert _looks_like_gate("<html></html>", "https://medex.com.bd/captcha-challenge")
-    # a real medicine page (mentions brand/dosage, no security title) is NOT gated
-    real = _fixture("detail_tablet.html")
-    assert not _looks_like_gate(real, "https://medex.com.bd/brands/13582/x")
-
-
-def test_gate_stops_run_instead_of_staging(actor):
-    """A captcha response must stop the run + leave the URL pending — never
-    stage the challenge page as an invalid medicine."""
-    from app.integrations.medex.importer import run_import
-    from app.integrations.medex.repository import create_run
-
-    class GateAfterFirst:
-        """First detail is real; every subsequent returns the captcha page."""
-
-        def __init__(self):
-            self.detail_calls = []
-
-        def fetch_index(self, page):
-            # minimal valid index: two brand-card anchors
-            html = """
-            <a class="brand-card" href="/brands/13582/ace-500-mg-tablet">
-              <span class="brand-card__name">Ace</span>
-              <span class="brand-card__generic">Paracetamol</span>
-            </a>
-            <a class="brand-card" href="/brands/6171/seclo-20-mg-capsule">
-              <span class="brand-card__name">Seclo</span>
-              <span class="brand-card__generic">Omeprazole</span>
-            </a>"""
-            return html, "https://medex.com.bd/brands"
-
-        def fetch_detail(self, url):
-            self.detail_calls.append(url)
-            if len(self.detail_calls) == 1:
-                html = _fixture("detail_tablet.html")
-                return html, html.encode()
-            return CAPTCHA_HTML, CAPTCHA_HTML.encode()
-
-    with SessionLocal() as db:
-        src = get_or_create_source(db)
-        run = create_run(db, src, scope="full", index_start=1, index_limit=1, detail_limit=None)
-        db.commit()
-        out = run_import(db, GateAfterFirst(), run, fetch_bn=False)
-        db.commit()
-        assert out.status == "gated"
-        # the captcha URL was pushed back to pending, not staged as a medicine
-        assert db.scalar(select(func.count(MedicineCatalogStaging.id))) == 1
