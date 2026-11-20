@@ -2,7 +2,17 @@
 
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { PackagePlus, Pencil, Power, PowerOff, Search, Trash2, Upload } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  PackagePlus,
+  Pencil,
+  Power,
+  PowerOff,
+  Search,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
 import { browserRequest, fieldErrors } from "@/lib/api-client";
 import {
@@ -37,6 +47,10 @@ export function ProductsClient({
   initialQuery,
   initialView = "",
   products,
+  total = 0,
+  page = 1,
+  pageSize = 50,
+  pageSizeOptions = [25, 50, 100, 200],
   categories,
   categoriesManage,
 }: {
@@ -46,6 +60,10 @@ export function ProductsClient({
   initialQuery: string;
   initialView?: string;
   products: ProductOut[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
+  pageSizeOptions?: number[];
   categories: CategoryOut[];
   categoriesManage: CategoryManageOut[];
 }) {
@@ -62,15 +80,29 @@ export function ProductsClient({
 
   function search(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    applyNav(query, view);
+    // a new search always restarts at page 1
+    applyNav(query, view, 1, pageSize);
   }
 
-  function applyNav(q: string, v: string) {
+  function applyNav(q: string, v: string, pg: number, size: number) {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (v) params.set("view", v);
+    if (pg > 1) params.set("page", String(pg));
+    if (size !== 50) params.set("pageSize", String(size));
     router.push(`/products${params.size ? `?${params}` : ""}`);
     router.refresh();
+  }
+
+  function gotoPage(pg: number) {
+    applyNav(query, view, pg, pageSize);
+  }
+
+  function changePageSize(size: number) {
+    // keep the first currently-visible item in view when the page size changes
+    const firstIndex = (page - 1) * pageSize;
+    const newPage = Math.floor(firstIndex / size) + 1;
+    applyNav(query, view, newPage, size);
   }
 
   const views = [
@@ -148,7 +180,7 @@ export function ProductsClient({
                 type="button"
                 onClick={() => {
                   setView(v.key);
-                  applyNav(query, v.key);
+                  applyNav(query, v.key, 1, pageSize);
                 }}
                 className={`min-h-8 rounded-full border px-3 text-xs font-semibold transition-colors ${
                   view === v.key
@@ -207,6 +239,15 @@ export function ProductsClient({
               </ul>
             </div>
           )}
+
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            pageSizeOptions={pageSizeOptions}
+            onPage={gotoPage}
+            onPageSize={changePageSize}
+          />
         </>
       )}
 
@@ -236,6 +277,121 @@ export function ProductsClient({
     );
     setEditing(detail);
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pagination                                                                  */
+
+function Pagination({
+  page,
+  pageSize,
+  total,
+  pageSizeOptions,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  pageSizeOptions: number[];
+  onPage: (page: number) => void;
+  onPageSize: (size: number) => void;
+}) {
+  const t = useTranslations("products");
+  if (total === 0) return null;
+
+  const pageCount = Math.max(Math.ceil(total / pageSize), 1);
+  const first = (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, total);
+
+  // Compact page-number window around the current page.
+  const pages: (number | "…")[] = [];
+  const push = (p: number | "…") => {
+    if (pages[pages.length - 1] !== p) pages.push(p);
+  };
+  const addPage = (p: number) => {
+    if (p >= 1 && p <= pageCount) push(p);
+  };
+  addPage(1);
+  if (page - 2 > 2) push("…");
+  for (let p = page - 2; p <= page + 2; p++) addPage(p);
+  if (page + 2 < pageCount - 1) push("…");
+  addPage(pageCount);
+
+  const numBtn =
+    "min-h-9 min-w-9 rounded-md border px-2 text-sm font-semibold transition-colors";
+
+  return (
+    <nav
+      className="flex flex-wrap items-center justify-between gap-3 pt-1"
+      aria-label={t("pagination")}
+    >
+      <p className="text-sm text-[var(--color-muted-foreground)]">
+        {t("results", { first, last, total })}
+      </p>
+
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          className={`${numBtn} border-[var(--color-border)] text-[var(--color-ink)] disabled:opacity-40`}
+          onClick={() => onPage(page - 1)}
+          disabled={page <= 1}
+          aria-label={t("previous")}
+        >
+          <ChevronLeft size={16} aria-hidden="true" />
+        </button>
+        {pages.map((p, i) =>
+          p === "…" ? (
+            <span
+              key={`gap-${i}`}
+              className="px-1 text-sm text-[var(--color-muted-foreground)]"
+              aria-hidden="true"
+            >
+              …
+            </span>
+          ) : (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onPage(p)}
+              aria-current={p === page ? "page" : undefined}
+              className={`${numBtn} ${
+                p === page
+                  ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
+                  : "border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-ink)] hover:border-[var(--color-primary)]"
+              }`}
+            >
+              {p}
+            </button>
+          ),
+        )}
+        <button
+          type="button"
+          className={`${numBtn} border-[var(--color-border)] text-[var(--color-ink)] disabled:opacity-40`}
+          onClick={() => onPage(page + 1)}
+          disabled={page >= pageCount}
+          aria-label={t("next")}
+        >
+          <ChevronRight size={16} aria-hidden="true" />
+        </button>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm text-[var(--color-muted-foreground)]">
+        {t("perPage")}
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSize(Number(e.target.value))}
+          className="rounded-md border border-[var(--color-border)] bg-[var(--color-card)] px-2 py-1.5 text-sm text-[var(--color-ink)]"
+        >
+          {pageSizeOptions.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </label>
+    </nav>
+  );
 }
 
 /* -------------------------------------------------------------------------- */

@@ -217,6 +217,11 @@
     "hasHistory": "Has sales/inventory history — cannot be deleted",
     "empty": "No products found",
     "emptyHint": "Add your first product to get started.",
+    "pagination": "Pages",
+    "previous": "Previous",
+    "next": "Next",
+    "results": "Showing {first}–{last} of {total}",
+    "perPage": "Per page",
     "errors": {
       "field": "This field is required or invalid",
       "duplicate": "SKU or barcode already exists",
